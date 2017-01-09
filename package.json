@@ -1,0 +1,31 @@
+{
+  "name": "mocked-server",
+  "version": "1.0.0",
+  "description": "Utility for mocking remote APIs servers for testing purposes",
+  "main": "src/MockedServer.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VaclavObornik/mocked-server.git"
+  },
+  "keywords": [
+    "mock",
+    "api",
+    "server",
+    "testing",
+    "tdd",
+    "bdd"
+  ],
+  "author": "Václav Oborník",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/VaclavObornik/mocked-server/issues"
+  },
+  "homepage": "https://github.com/VaclavObornik/mocked-server#readme",
+  "dependencies": {
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0"
+  }
+}
