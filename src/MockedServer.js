@@ -5,7 +5,6 @@ const express = require('express');
 const Router = require('express').Router;
 const bodyParser = require('body-parser');
 const assert = require('assert');
-const pathToRegexp = require('path-to-regexp');
 
 
 class MockServer {
@@ -27,44 +26,49 @@ class MockServer {
             done();
         });
 
-        this._handlers = [];
+        this._nextHandlersCounter = 0;
+        this._nextHandlersRouter = new Router();
+        this._app.use((req, res, next) => {
+            this._nextHandlersRouter.handle(req, res, next);
+        });
+
+        this._commonHanlersRouter = new Router();
+        this._app.use(this._commonHanlersRouter);
 
         this._app.use((req, res) => {
-
-            const currentHandler = this._handlers.shift();
-            if (!currentHandler) {
-                throw new Error('No handler registered.');
-            }
-
-            const router = new Router();
-
-            const method = currentHandler.method.toLowerCase();
-            router[method](currentHandler.path, (req, res) => {
-                currentHandler.handler(req, res);
-                currentHandler.resolve();
+            let error = new Error(`No handler match the "[${req.method}] ${req.path}" request`);
+            res.status(500).send({
+                error: error.toString()
             });
-
-            router.handle(req, res, () => {
-                let error = new Error('The path or method does not match');
-                currentHandler.reject(error);
-                throw error;
-            });
-
         });
     }
 
-    assertAllHandlersProcessed () {
-        assert.equal(this._handlers.length, 0, 'Not all handlers has been processed.');
+    assertAllNextHandlersProcessed () {
+        assert.equal(this._nextHandlersCounter, 0, 'Not all next-handlers has been processed.');
     }
 
     handleNext (method, path, handler) {
+        this._nextHandlersCounter++;
+        var alreadyUsed = false;
         return new Promise((resolve, reject) => {
-            this._handlers.push({ method, path, handler, resolve, reject });
+            this._nextHandlersRouter[method.toLowerCase()](path, (req, res, next) => {
+                if (alreadyUsed) {
+                    return next();
+                }
+                this._nextHandlersCounter--;
+                alreadyUsed = true;
+                Promise.resolve(handler(req, res)).then(() => resolve(), reject);
+            });
         });
     }
 
+    handle (method, path, handler) {
+        this._commonHanlersRouter[method.toLowerCase()](path, handler);
+    }
+
     reset (done) {
-        this._handlers.splice(0, this._handlers.length);
+        this._nextHandlersRouter = new Router();
+        this._nextHandlersCounter = 0;
         done();
     }
 
