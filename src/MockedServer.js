@@ -57,7 +57,7 @@ class MockServer {
                 }
                 this._nextHandlersCounter--;
                 alreadyUsed = true;
-                Promise.resolve(handler(req, res)).then(() => resolve(), reject);
+                Promise.resolve(handler(req, res, next)).then(() => resolve(), reject);
             });
         });
     }
