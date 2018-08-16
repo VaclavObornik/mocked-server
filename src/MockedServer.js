@@ -20,7 +20,8 @@ class MockServer {
         }
 
         this._app = express();
-        this._app.use(bodyParser.json());
+        this._app.use(bodyParser.text({ type: 'text/*' }));
+        this._app.use(bodyParser.json({ type: '*/json' }));
 
         this._server = this._app.listen(this._port, () => {
             done();
