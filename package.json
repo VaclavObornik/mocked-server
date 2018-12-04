@@ -25,7 +25,15 @@
   },
   "homepage": "https://github.com/VaclavObornik/mocked-server#readme",
   "dependencies": {
-    "body-parser": "^1.18.3",
-    "express": "^4.14.0"
+    "koa": "^2.6.2",
+    "koa-body": "^4.0.4",
+    "koa-router": "^7.4.0"
+  },
+  "peerDependencies": {
+    "mocha": "*"
+  },
+  "devDependencies": {
+    "mocha": "^5.2.0",
+    "supertest": "^3.3.0"
   }
 }
