@@ -34,7 +34,7 @@ class MockServer {
         this._app.use(this._commonHanlersRouter.routes());
 
         this._app.use((ctx) => {
-            const error = new Error(`No handler match the "[${ctx.req.method}] ${ctx.req.path}" request`);
+            const error = new Error(`No handler match the "[${ctx.request.method}] ${ctx.request.path}" request`);
             ctx.status = 404;
             ctx.body = { error: error.toString() };
         });
