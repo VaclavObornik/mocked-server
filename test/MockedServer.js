@@ -57,6 +57,15 @@ describe('MockedServer', function () {
         );
 
 
+        mockApi.handleNext('GET', '/success-path', async (ctx) => {
+            ctx.body = { success: true };
+        });
+        await assert.throws(
+            () => mockApi.assertAllNextHandlersProcessed(),
+            /Mock api didn't receive expected GET request to '\/success-path' path/,
+            'The assertAllNextHandlersProcessed should check all next handlers'
+        );
+
 
         /* TODO
         await assert.rejects(

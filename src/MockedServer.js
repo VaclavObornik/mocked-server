@@ -4,7 +4,6 @@ const url = require('url');
 const Koa = require('koa');
 const Router = require('koa-router');
 const bodyParser = require('koa-body');
-const assert = require('assert');
 const mocha = require('mocha');
 
 class MockServer {
@@ -25,7 +24,7 @@ class MockServer {
         this._app = new Koa();
         this._app.use(bodyParser());
 
-        this._nextHandlersCounter = 0;
+        this._nextHandlerCheckers = [];
         this._nextHandlersRouter = new Router();
         this._app.use((ctx, next) => {
             this._nextHandlersRouter.routes()(ctx, next);
@@ -58,7 +57,7 @@ class MockServer {
     }
 
     assertAllNextHandlersProcessed () {
-        assert.strictEqual(this._nextHandlersCounter, 0, 'Not all next-handlers has been processed.');
+        this._nextHandlerCheckers.forEach(checker => checker());
     }
 
     /**
@@ -68,16 +67,37 @@ class MockServer {
      * @returns {Function} Returns function that checks the handler was called and responded successfully
      */
     handleNext (method, path, handler) {
-        this._nextHandlersCounter++;
-        let alreadyUsed = false;
+        let handlerCalled = false;
         let error;
+        let checker;
+
+        const removeChecker = () => {
+            if (checker) {
+                const checkIndex = this._nextHandlerCheckers.indexOf(checker);
+                this._nextHandlerCheckers.splice(checkIndex, 1);
+            }
+        };
+
+        // const stack = new Error().stack.split('\n').slice(2).join('\n');
+        checker = () => {
+            removeChecker();
+            if (!handlerCalled) {
+                handlerCalled = true;
+                error = new Error(`Mock api didn't receive expected ${method.toUpperCase()} request to '${path}' path.`);
+            }
+            if (error) {
+                // error.stack = stack;
+                throw error;
+            }
+        };
+
+        this._nextHandlerCheckers.push(checker);
 
         this._nextHandlersRouter[method.toLowerCase()](path, async (ctx, next) => {
-            if (alreadyUsed) {
+            if (handlerCalled) {
                 return next();
             }
-            this._nextHandlersCounter--;
-            alreadyUsed = true;
+            handlerCalled = true;
 
             try {
                 await handler(ctx, next);
@@ -86,20 +106,7 @@ class MockServer {
             }
         });
 
-        const stack = new Error().stack.split('\n').slice(2).join('\n');
-        // TODO continue stack from error if is caused by the handler
-
-        return () => {
-            if (!alreadyUsed) {
-                this._nextHandlersCounter--;
-                alreadyUsed = true;
-                error = new Error(`Mock api didn't receive expected ${method.toUpperCase()} request to '${path}' path.`);
-            }
-            if (error) {
-                // error.stack = stack;
-                throw error;
-            }
-        };
+        return checker;
     }
 
     /**
@@ -113,7 +120,7 @@ class MockServer {
 
     reset () {
         this._nextHandlersRouter = new Router();
-        this._nextHandlersCounter = 0;
+        this._nextHandlerCheckers = [];
     }
 
 }
