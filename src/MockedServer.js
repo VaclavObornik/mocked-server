@@ -57,13 +57,6 @@ class MockServer {
     }
 
     /**
-     * Runs all not-called checkers.
-     */
-    runAllCheckers () {
-        this._pendingCheckers.forEach(checker => checker());
-    }
-
-    /**
      * Adds one-time handler. First request to the 'method' and 'path' will be processed by the handler and cause
      * the handler removal.
      * The handlers registered using 'handleNext' method has precedence over handlers registered via the 'handle' method
@@ -126,6 +119,30 @@ class MockServer {
         });
     }
 
+
+    /**
+     * Runs all not-called checkers.
+     */
+    runAllCheckers () {
+        this._pendingCheckers.forEach(checker => checker());
+    }
+
+    /**
+     * Add general handler that respond to all method and path requests.
+     *
+     * @param {string} method
+     * @param {string} path
+     * @param {Function} handler
+     */
+    handle (method, path, handler) {
+        this._commonHanlersRouter[method.toLowerCase()](path, handler);
+    }
+
+    reset () {
+        this._nextHandlersRouter = new Router();
+        this._pendingCheckers = [];
+    }
+
     _registerChecker (callback) {
         const checker = () => {
             const indexOfChecker = this._pendingCheckers.indexOf(checker);
@@ -154,22 +171,6 @@ class MockServer {
         });
 
         return disableHandler;
-    }
-
-    /**
-     * Add general handler that respond to all method and path requests.
-     *
-     * @param {string} method
-     * @param {string} path
-     * @param {Function} handler
-     */
-    handle (method, path, handler) {
-        this._commonHanlersRouter[method.toLowerCase()](path, handler);
-    }
-
-    reset () {
-        this._nextHandlersRouter = new Router();
-        this._pendingCheckers = [];
     }
 
 }
