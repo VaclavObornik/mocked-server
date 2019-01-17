@@ -24,7 +24,7 @@ class MockServer {
         this._app = new Koa();
         this._app.use(bodyParser());
 
-        this._nextHandlerCheckers = [];
+        this._pendingCheckers = [];
         this._nextHandlersRouter = new Router();
         this._app.use((ctx, next) => {
             this._nextHandlersRouter.routes()(ctx, next);
@@ -53,63 +53,112 @@ class MockServer {
 
         mocha.beforeEach(() => this.reset());
 
-        mocha.afterEach(() => this.assertAllNextHandlersProcessed());
-    }
-
-    assertAllNextHandlersProcessed () {
-        this._nextHandlerCheckers.forEach(checker => checker());
+        mocha.afterEach(() => this.runAllCheckers());
     }
 
     /**
+     * Runs all not-called checkers.
+     */
+    runAllCheckers () {
+        this._pendingCheckers.forEach(checker => checker());
+    }
+
+    /**
+     * Adds one-time handler. First request to the 'method' and 'path' will be processed by the handler and cause
+     * the handler removal.
+     * The handlers registered using 'handleNext' method has precedence over handlers registered via the 'handle' method
+     * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
+     * and cause the handler removal.
+     *
      * @param {string} method
      * @param {string} path
      * @param {Function} handler
-     * @returns {Function} Returns function that checks the handler was called and responded successfully
+     * @returns {Function} Returns function that checks the route was requested and the handler responded without error.
      */
     handleNext (method, path, handler) {
-        let handlerCalled = false;
+
+        let requestReceived = false;
         let error;
-        let checker;
 
-        const removeChecker = () => {
-            if (checker) {
-                const checkIndex = this._nextHandlerCheckers.indexOf(checker);
-                this._nextHandlerCheckers.splice(checkIndex, 1);
+        const cancel = this._addOnetimeHandler(method, path, async (ctx, next) => {
+            requestReceived = true;
+            try {
+                await handler(ctx, next);
+            } catch (handleError) {
+                error = handleError;
             }
-        };
+        });
 
-        // const stack = new Error().stack.split('\n').slice(2).join('\n');
-        checker = () => {
-            removeChecker();
-            if (!handlerCalled) {
-                handlerCalled = true;
+        return this._registerChecker(() => {
+            cancel();
+            if (!requestReceived) {
                 error = new Error(`Mock api didn't receive expected ${method.toUpperCase()} request to '${path}' path.`);
             }
             if (error) {
-                // error.stack = stack;
                 throw error;
             }
-        };
+        });
+    }
 
-        this._nextHandlerCheckers.push(checker);
+    /**
+     * Adds one-time check. The checker will fail in case of any request to the method and path.
+     * The checks registered using 'notReceive' method.
+     * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
+     * and cause the handler removal.
+     *
+     * @param {string} method
+     * @param {string} path
+     * @returns {Function} Returns function that checks the route was NOT requested.
+     */
+    notReceive (method, path) {
+        let error;
 
-        this._nextHandlersRouter[method.toLowerCase()](path, async (ctx, next) => {
-            if (handlerCalled) {
-                return next();
-            }
-            handlerCalled = true;
+        const cancel = this._addOnetimeHandler(method, path, async (ctx, next) => {
+            error = new Error(`Mock api received unexpected ${method.toUpperCase()} request to '${path}' path`);
+            next();
+        });
 
-            try {
-                await handler(ctx, next);
-            } catch (e) {
-                error = e;
+        return this._registerChecker(() => {
+            cancel();
+            if (error) {
+                throw error;
             }
         });
+    }
+
+    _registerChecker (callback) {
+        const checker = () => {
+            const indexOfChecker = this._pendingCheckers.indexOf(checker);
+            if (indexOfChecker >= 0) {
+                this._pendingCheckers.splice(indexOfChecker, 1);
+            }
+            callback();
+        };
+
+        this._pendingCheckers.push(checker);
 
         return checker;
     }
 
+    _addOnetimeHandler (method, path, handler) {
+
+        let pending = true;
+        const disableHandler = () => (pending = false);
+
+        this._nextHandlersRouter[method.toLowerCase()](path, async (ctx, next) => {
+            if (!pending) {
+                return next();
+            }
+            disableHandler();
+            await handler(ctx, next);
+        });
+
+        return disableHandler;
+    }
+
     /**
+     * Add general handler that respond to all method and path requests.
+     *
      * @param {string} method
      * @param {string} path
      * @param {Function} handler
@@ -120,7 +169,7 @@ class MockServer {
 
     reset () {
         this._nextHandlersRouter = new Router();
-        this._nextHandlerCheckers = [];
+        this._pendingCheckers = [];
     }
 
 }

@@ -61,22 +61,22 @@ describe('MockedServer', function () {
             ctx.body = { success: true };
         });
         await assert.throws(
-            () => mockApi.assertAllNextHandlersProcessed(),
+            () => mockApi.runAllCheckers(),
             /Mock api didn't receive expected GET request to '\/success-path' path/,
-            'The assertAllNextHandlersProcessed should check all next handlers'
+            'The runAllCheckers should check all next handlers'
         );
 
+        await request.get('/some-path')
+            .expect(mockApi.notReceive('GET', '/unexpected-path'));
 
-        /* TODO
         await assert.rejects(
             async () => {
                 await request.get('/success-path')
                     .expect(mockApi.notReceive('GET', '/success-path'));
             },
-            /Mock api received not-expected GET request to '\/success-path' path/,
+            /Mock api received unexpected GET request to '\/success-path' path/,
             'Expect function should fail when API receives not expected request'
         );
-        */
 
     });
 
