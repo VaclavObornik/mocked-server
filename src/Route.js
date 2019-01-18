@@ -21,7 +21,7 @@ class Route {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      *
-     * @param {IHandler} handler
+     * @param {IHandler} [handler]
      * @returns {IChecker}
      */
     handleNext (handler) {

@@ -39,6 +39,7 @@ class MockServer {
         this._app.use(bodyParser());
 
         this._pendingCheckers = [];
+        this._nextHandledRequests = new WeakMap();
         this._nextHandlersRouter = new Router();
         this._app.use((ctx, next) => {
             this._nextHandlersRouter.routes()(ctx, next);
@@ -79,10 +80,10 @@ class MockServer {
      *
      * @param {IMethod} method
      * @param {string} path
-     * @param {IHandler} handler
+     * @param {IHandler} [handler]
      * @returns {IChecker} Returns function that checks the route was requested and the handler responded without error.
      */
-    handleNext (method, path, handler) {
+    handleNext (method, path, handler = (ctx, next) => next()) {
 
         let requestReceived = false;
         let error;
@@ -194,9 +195,10 @@ class MockServer {
         const disableHandler = () => (pending = false);
 
         this._nextHandlersRouter[method.toLowerCase()](path, async (ctx, next) => {
-            if (!pending) {
+            if (!pending || this._nextHandledRequests.has(ctx)) {
                 return next();
             }
+            this._nextHandledRequests.set(ctx, ctx);
             disableHandler();
             await handler(ctx, next);
         });

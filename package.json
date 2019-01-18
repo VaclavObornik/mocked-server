@@ -4,7 +4,7 @@
   "description": "Utility for mocking remote APIs servers for testing purposes",
   "main": "src/MockedServer.js",
   "scripts": {
-    "test": "test"
+    "test": "mocha test --recursive"
   },
   "repository": {
     "type": "git",

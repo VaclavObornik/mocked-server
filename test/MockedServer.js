@@ -40,6 +40,33 @@ describe('handleNext', () => {
             .expect(200, { endpoint: 1 });
     });
 
+    it('should be able to just check a request comes and forward request to defaultHandler', async () => {
+
+        await request.get('/general-endpoint')
+            .expect(mockApi.generalEndpoint.handleNext())
+            .expect(200, { endpoint: 1 });
+
+        await request.get('/general-endpoint')
+            .expect(200, { endpoint: 1 });
+    });
+
+    it('should not forward request to a next handleNext handler', async () => {
+
+        const handleNextCheck1 = mockApi.generalEndpoint.handleNext();
+
+        const handleNextCheck2 = mockApi.generalEndpoint.handleNext((ctx) => {
+            ctx.body = { endpoint: 'myCustomBody' };
+        });
+
+        await request.get('/general-endpoint')
+            .expect(handleNextCheck1)
+            .expect(200, { endpoint: 1 });
+
+        await request.get('/general-endpoint')
+            .expect(handleNextCheck2)
+            .expect(200, { endpoint: 'myCustomBody' });
+    });
+
     it('should propagate error by checker', async () => {
 
         await assert.rejects(
