@@ -3,10 +3,20 @@
 const MockedServer = require('../src/MockedServer');
 const { url } = require('./mockApiUrlAndPort');
 
-const mockApi = new MockedServer(url);
+class MockApi extends MockedServer {
 
-mockApi.handle('GET', '/general-endpoint', async (ctx) => {
-    ctx.body = { data: 'aaa' };
-});
+    constructor () {
+        super(url);
 
-module.exports = mockApi;
+        /**
+         * @type {Route}
+         */
+        this.generalEndpoint = this.route('GET', '/general-endpoint', (ctx) => {
+            ctx.body = { endpoint: 1 };
+        });
+
+    }
+
+}
+
+module.exports = new MockApi();

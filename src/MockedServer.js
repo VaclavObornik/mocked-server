@@ -5,6 +5,20 @@ const Koa = require('koa');
 const Router = require('koa-router');
 const bodyParser = require('koa-body');
 const mocha = require('mocha');
+const Route = require('./Route');
+
+
+/** @typedef {'GET'|'PUT'|'POST'|'PATCH'|'DELETE'|'DEL'} IMethod */
+
+/**
+ * @callback IHandler
+ * @param {*} ctx
+ * @param {Function} next
+ */
+
+/**
+ * @callback IChecker
+ */
 
 class MockServer {
 
@@ -63,10 +77,10 @@ class MockServer {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      *
-     * @param {string} method
+     * @param {IMethod} method
      * @param {string} path
-     * @param {Function} handler
-     * @returns {Function} Returns function that checks the route was requested and the handler responded without error.
+     * @param {IHandler} handler
+     * @returns {IChecker} Returns function that checks the route was requested and the handler responded without error.
      */
     handleNext (method, path, handler) {
 
@@ -99,9 +113,9 @@ class MockServer {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      *
-     * @param {string} method
+     * @param {IMethod} method
      * @param {string} path
-     * @returns {Function} Returns function that checks the route was NOT requested.
+     * @returns {IChecker} Returns function that checks the route was NOT requested.
      */
     notReceive (method, path) {
         let error;
@@ -119,7 +133,6 @@ class MockServer {
         });
     }
 
-
     /**
      * Runs all not-called checkers.
      */
@@ -130,17 +143,35 @@ class MockServer {
     /**
      * Add general handler that respond to all method and path requests.
      *
-     * @param {string} method
+     * @param {IMethod} method
      * @param {string} path
-     * @param {Function} handler
+     * @param {IHandler} handler
      */
     handle (method, path, handler) {
         this._commonHanlersRouter[method.toLowerCase()](path, handler);
     }
 
+    /**
+     * Removes all registered one-time handlers and pending checkers
+     */
     reset () {
         this._nextHandlersRouter = new Router();
         this._pendingCheckers = [];
+    }
+
+    /**
+     * @param {IMethod} method
+     * @param {string} path
+     * @param {IHandler} [defaultHandler]
+     * @returns {Route}
+     */
+    route (method, path, defaultHandler) {
+
+        if (defaultHandler) {
+            this.handle(method, path, defaultHandler);
+        }
+
+        return new Route(this, method, path);
     }
 
     _registerChecker (callback) {
