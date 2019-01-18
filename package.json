@@ -1,6 +1,6 @@
 {
   "name": "mocked-server",
-  "version": "4.0.1",
+  "version": "4.1.0",
   "description": "Utility for mocking remote APIs servers for testing purposes",
   "main": "src/MockedServer.js",
   "scripts": {
