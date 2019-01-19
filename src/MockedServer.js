@@ -143,7 +143,8 @@ class MockServer {
      * Runs all not-called checkers.
      */
     runAllCheckers () {
-        this._pendingCheckers.forEach(checker => checker());
+        // slice because of the original array is being changed during the iteration
+        this._pendingCheckers.slice().forEach(checker => checker());
     }
 
     /**

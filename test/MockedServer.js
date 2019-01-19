@@ -147,13 +147,22 @@ describe('MockedServer', () => {
 
 describe('runAllCheckers', () => {
 
-    it('should call not-called handleNext checker', async () => {
-        mockApi.handleNext('GET', '/success-path', async (ctx) => {
-            ctx.body = { success: true };
-        });
+    it('should call not-called checker', async () => {
+        mockApi.handleNext('GET', '/success-path');
         await assert.throws(
             () => mockApi.runAllCheckers(),
             /Mock api didn't receive expected GET request to '\/success-path' path/,
+            'The runAllCheckers should check all next handlers'
+        );
+    });
+
+    it('should call multiple not-called checkers', async () => {
+        mockApi.notReceive('GET', '/success-path-1');
+        mockApi.handleNext('GET', '/success-path-2');
+        mockApi.notReceive('GET', '/success-path-3');
+        await assert.throws(
+            () => mockApi.runAllCheckers(),
+            /Mock api didn't receive expected GET request to '\/success-path-2' path/,
             'The runAllCheckers should check all next handlers'
         );
     });
