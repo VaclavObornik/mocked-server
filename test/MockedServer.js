@@ -125,6 +125,24 @@ describe('MockedServer', () => {
             .expect(404);
     });
 
+    it('should be able to receive text requests', async () => {
+        await request.get('/some-text-path')
+            .set({ 'Content-Type': 'text/plain' })
+            .send('articleText')
+            .expect(mockApi.handleNext('GET', '/some-text-path', (ctx) => {
+                assert.strictEqual(ctx.request.body, 'articleText');
+            }));
+    });
+
+    it('should be able to receive xml as text requests', async () => {
+        await request.get('/some-text-path')
+            .set({ 'Content-Type': 'text/xml' })
+            .send('articleText')
+            .expect(mockApi.handleNext('GET', '/some-text-path', (ctx) => {
+                assert.strictEqual(ctx.request.body, 'articleText');
+            }));
+    });
+
 });
 
 describe('runAllCheckers', () => {

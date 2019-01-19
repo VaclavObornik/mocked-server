@@ -3,7 +3,7 @@
 const url = require('url');
 const Koa = require('koa');
 const Router = require('koa-router');
-const bodyParser = require('koa-body');
+const bodyParser = require('koa-bodyparser');
 const mocha = require('mocha');
 const Route = require('./Route');
 
@@ -36,7 +36,12 @@ class MockServer {
         }
 
         this._app = new Koa();
-        this._app.use(bodyParser());
+        this._app.use(bodyParser({
+            enableTypes: ['json', 'form', 'text'],
+            extendTypes: {
+                text: 'text/xml'
+            }
+        }));
 
         this._pendingCheckers = [];
         this._nextHandledRequests = new WeakMap();
