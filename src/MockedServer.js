@@ -73,7 +73,15 @@ class MockServer {
 
         mocha.beforeEach(() => this.reset());
 
-        mocha.afterEach(() => this.runAllCheckers());
+        const runAllCheckers = this.runAllCheckers.bind(this);
+        mocha.afterEach(function () {
+            try {
+                runAllCheckers();
+            } catch (err) {
+                this.test.error(err);
+                throw err; // because WebStorm
+            }
+        });
     }
 
     /**
