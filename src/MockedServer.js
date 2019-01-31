@@ -46,8 +46,8 @@ class MockServer {
         this._pendingCheckers = [];
         this._nextHandledRequests = new WeakMap();
         this._nextHandlersRouter = new Router();
-        this._app.use((ctx, next) => {
-            this._nextHandlersRouter.routes()(ctx, next);
+        this._app.use(async (ctx, next) => {
+            await this._nextHandlersRouter.routes()(ctx, next);
         });
 
         this._commonHanlersRouter = new Router();

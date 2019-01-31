@@ -95,6 +95,15 @@ describe('handleNext', () => {
         );
     });
 
+    it('should be able to process async awaited handler', async () => {
+        await request.get('/general-endpoint')
+            .expect(mockApi.generalEndpoint.handleNext(async (ctx, next) => {
+                await new Promise(resolve => setTimeout(resolve, 10));
+                await next();
+            }))
+            .expect(200, { endpoint: 1 });
+    });
+
 });
 
 describe('notReceive', () => {
