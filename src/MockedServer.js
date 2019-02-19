@@ -79,7 +79,6 @@ class MockServer {
                 runAllCheckers();
             } catch (err) {
                 this.test.error(err);
-                throw err; // because WebStorm
             }
         });
     }
