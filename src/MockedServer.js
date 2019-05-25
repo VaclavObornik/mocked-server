@@ -18,6 +18,7 @@ const Route = require('./Route');
 
 /**
  * @callback IChecker
+ * @throws
  */
 
 class MockServer {
@@ -99,25 +100,58 @@ class MockServer {
 
         let requestReceived = false;
         let error;
+        let resolvePromise;
+        let rejectPromise;
+        let promiseUsed = false;
 
         const cancel = this._addOnetimeHandler(method, path, async (ctx, next) => {
             requestReceived = true;
             try {
                 await handler(ctx, next);
+                if (promiseUsed) {
+                    resolvePromise();
+                }
             } catch (handleError) {
                 error = handleError;
+                if (promiseUsed) {
+                    rejectPromise(error);
+                }
             }
         });
 
-        return this._registerChecker(() => {
+        const checker = this._registerChecker(() => {
             cancel();
             if (!requestReceived) {
                 error = new Error(`Mock api didn't receive expected ${method.toUpperCase()} request to '${path}' path.`);
+                if (promiseUsed) {
+                    rejectPromise(error);
+                }
             }
             if (error) {
                 throw error;
             }
         });
+
+        const promise = new Promise((resolve, reject) => {
+            resolvePromise = resolve;
+            rejectPromise = reject;
+        });
+
+        for (const method of ['then', 'catch', 'finally']) {
+            checker[method] = (...args) => {
+                if (!promiseUsed) {
+                    promiseUsed = true;
+                    if (error) {
+                        rejectPromise(error);
+                    } else if (requestReceived) {
+                        resolvePromise();
+                    }
+                }
+                return promise[method](...args);
+            };
+        }
+
+        return checker;
     }
 
     /**
@@ -211,6 +245,7 @@ class MockServer {
             if (!pending || this._nextHandledRequests.has(ctx)) {
                 return next();
             }
+
             this._nextHandledRequests.set(ctx, ctx);
             disableHandler();
             await handler(ctx, next);

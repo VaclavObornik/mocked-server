@@ -104,6 +104,52 @@ describe('handleNext', () => {
             .expect(200, { endpoint: 1 });
     });
 
+    it('should return checker which is thenable with promise resolved once the handler is called', async () => {
+
+        const interval = 300;
+        const start = Date.now();
+
+        setTimeout(async () => {
+            await request.get('/general-endpoint');
+        }, interval);
+
+        await mockApi.generalEndpoint.handleNext((ctx) => {
+            ctx.body = {};
+            ctx.status = 200;
+        });
+
+        assert(Date.now() - start >= interval);
+    });
+
+    it('should return checker which is thenable with promise rejected by error', async () => {
+
+        const interval = 300;
+        const start = Date.now();
+
+        setTimeout(async () => {
+            await request.get('/general-endpoint');
+        }, interval);
+
+        let checker;
+
+        await assert.rejects(
+            async () => {
+                checker = mockApi.generalEndpoint.handleNext(() => {
+                    throw new Error('Bad request');
+                });
+
+                await checker;
+            },
+            /Bad request/,
+            'Promise from handleNext should propagate error'
+        );
+
+        assert.throws(checker, /Bad request/, 'Checker should throw same error on call');
+
+        assert(Date.now() - start >= interval);
+    });
+
+
 });
 
 describe('notReceive', () => {
