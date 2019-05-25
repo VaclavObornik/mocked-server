@@ -149,6 +149,32 @@ describe('handleNext', () => {
         assert(Date.now() - start >= interval);
     });
 
+     describe('matching', () => {
+
+        it('should be possible to use matcher', async () => {
+
+            mockApi.generalEndpoint.handleNext((ctx) => {
+                ctx.status = 201;
+                ctx.body = 'onetimeHandler1';
+            });
+
+            mockApi.generalEndpoint
+                .matching(({ params: { resourceId }}) => resourceId === '99')
+                .handleNext((ctx) => {
+                    ctx.status = 202;
+                    ctx.body = 'onetimeHandler2';
+                });
+
+            await request.get('/general-endpoint')
+                .expect(200, { endpoint: 1 });
+
+            await request.get('/general-endpoint/99')
+                .expect(201, 'onetimeHandler2');
+
+            await request.get('/general-endpoint')
+                .expect(201, 'onetimeHandler1');
+        });
+    });
 
 });
 

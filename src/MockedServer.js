@@ -236,13 +236,22 @@ class MockServer {
         return checker;
     }
 
-    _addOnetimeHandler (method, path, handler) {
+    _addOnetimeHandler (method, path, handler, matcher = null) {
 
         let pending = true;
         const disableHandler = () => (pending = false);
 
         this._nextHandlersRouter[method.toLowerCase()](path, async (ctx, next) => {
-            if (!pending || this._nextHandledRequests.has(ctx)) {
+
+            if (!pending) {
+                return next();
+            }
+
+            if (this._nextHandledRequests.has(ctx)) {
+                return next();
+            }
+
+            if (matcher && !(await matcher(ctx))) {
                 return next();
             }
 
