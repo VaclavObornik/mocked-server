@@ -86,11 +86,11 @@ describe('handleNext', () => {
         await assert.rejects(
             async () => {
                 await request.get('/some-unknown-path')
-                    .expect(mockApi.handleNext('GET', '/success-path', async (ctx) => {
+                    .expect(mockApi.generalEndpoint.handleNext(async (ctx) => {
                         ctx.body = { success: true };
                     }));
             },
-            /Mock api didn't receive expected GET request to '\/success-path' path/,
+            /Mock api didn't receive expected GET request to '\/general-endpoint\/:resourceId\?' path/,
             'Expect function should fail when expected call was not received'
         );
     });
@@ -144,19 +144,51 @@ describe('handleNext', () => {
             'Promise from handleNext should propagate error'
         );
 
-        assert.throws(checker, /Bad request/, 'Checker should throw same error on call');
-
         assert(Date.now() - start >= interval);
+    });
+
+    it('should be able to receive text requests', async () => {
+        await request.get('/general-endpoint')
+            .set({ 'Content-Type': 'text/plain' })
+            .send('articleText')
+            .expect(mockApi.generalEndpoint.handleNext((ctx) => {
+                assert.strictEqual(ctx.request.body, 'articleText');
+            }));
+    });
+
+    it('should be able to receive xml as text requests', async () => {
+        await request.get('/general-endpoint')
+            .set({ 'Content-Type': 'text/xml' })
+            .send('articleText')
+            .expect(mockApi.generalEndpoint.handleNext((ctx) => {
+                assert.strictEqual(ctx.request.body, 'articleText');
+            }));
+    });
+
+    describe('notReceive', () => {
+
+        it('should fail when any request came to the endpoint', async () => {
+
+            await assert.rejects(
+                async () => {
+                    await request.get('/general-endpoint')
+                        .expect(mockApi.generalEndpoint.notReceive());
+                },
+                /Mock api received unexpected GET request to '\/general-endpoint\/:resourceId\?' path/,
+                'Expect function should fail when API receives not expected request'
+            );
+        });
+
+        it('should be ok when no request came to endpoint', async () => {
+            await request.get('/general-endpoint-wrong-path')
+                .expect(mockApi.generalEndpoint.notReceive());
+        });
+
     });
 
      describe('matching', () => {
 
         it('should be possible to use matcher', async () => {
-
-            mockApi.generalEndpoint.handleNext((ctx) => {
-                ctx.status = 201;
-                ctx.body = 'onetimeHandler1';
-            });
 
             mockApi.generalEndpoint
                 .matching(({ params: { resourceId }}) => resourceId === '99')
@@ -165,36 +197,21 @@ describe('handleNext', () => {
                     ctx.body = 'onetimeHandler2';
                 });
 
+            mockApi.generalEndpoint.handleNext((ctx) => {
+                ctx.status = 201;
+                ctx.body = 'onetimeHandler1';
+            });
+
+            await request.get('/general-endpoint')
+                .expect(201, 'onetimeHandler1');
+
             await request.get('/general-endpoint')
                 .expect(200, { endpoint: 1 });
 
             await request.get('/general-endpoint/99')
-                .expect(201, 'onetimeHandler2');
+                .expect(202, 'onetimeHandler2');
 
-            await request.get('/general-endpoint')
-                .expect(201, 'onetimeHandler1');
         });
-    });
-
-});
-
-describe('notReceive', () => {
-
-    it('should fail when any request came to the endpoint', async () => {
-
-        await assert.rejects(
-            async () => {
-                await request.get('/success-path')
-                    .expect(mockApi.notReceive('GET', '/success-path'));
-            },
-            /Mock api received unexpected GET request to '\/success-path' path/,
-            'Expect function should fail when API receives not expected request'
-        );
-    });
-
-    it('should be ok when no request came to endpoint', async () => {
-        await request.get('/some-path')
-            .expect(mockApi.generalEndpoint.notReceive());
     });
 
 });
@@ -206,46 +223,30 @@ describe('MockedServer', () => {
             .expect(404);
     });
 
-    it('should be able to receive text requests', async () => {
-        await request.get('/some-text-path')
-            .set({ 'Content-Type': 'text/plain' })
-            .send('articleText')
-            .expect(mockApi.handleNext('GET', '/some-text-path', (ctx) => {
-                assert.strictEqual(ctx.request.body, 'articleText');
-            }));
-    });
 
-    it('should be able to receive xml as text requests', async () => {
-        await request.get('/some-text-path')
-            .set({ 'Content-Type': 'text/xml' })
-            .send('articleText')
-            .expect(mockApi.handleNext('GET', '/some-text-path', (ctx) => {
-                assert.strictEqual(ctx.request.body, 'articleText');
-            }));
-    });
+    describe('runAllCheckers', () => {
 
-});
+        it('should call not-called checker', async () => {
+            mockApi.generalEndpoint.handleNext();
+            await assert.throws(
+                () => mockApi.runAllCheckers(),
+                /Mock api didn't receive expected GET request to '\/general-endpoint\/:resourceId\?' path/,
+                'The runAllCheckers should check all next handlers'
+            );
+        });
 
-describe('runAllCheckers', () => {
+        it('should call multiple not-called checkers', async () => {
+            mockApi.generalEndpoint.notReceive();
+            mockApi.generalEndpoint.handleNext();
+            mockApi.generalEndpoint.notReceive();
+            await assert.throws(
+                () => mockApi.runAllCheckers(),
+                /Mock api didn't receive expected GET request to '\/general-endpoint\/:resourceId\?' path/,
+                'The runAllCheckers should check all next handlers'
+            );
+        });
 
-    it('should call not-called checker', async () => {
-        mockApi.handleNext('GET', '/success-path');
-        await assert.throws(
-            () => mockApi.runAllCheckers(),
-            /Mock api didn't receive expected GET request to '\/success-path' path/,
-            'The runAllCheckers should check all next handlers'
-        );
-    });
-
-    it('should call multiple not-called checkers', async () => {
-        mockApi.notReceive('GET', '/success-path-1');
-        mockApi.handleNext('GET', '/success-path-2');
-        mockApi.notReceive('GET', '/success-path-3');
-        await assert.throws(
-            () => mockApi.runAllCheckers(),
-            /Mock api didn't receive expected GET request to '\/success-path-2' path/,
-            'The runAllCheckers should check all next handlers'
-        );
     });
 
 });
+

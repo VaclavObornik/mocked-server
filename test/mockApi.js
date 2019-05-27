@@ -8,7 +8,7 @@ class MockApi extends MockedServer {
     constructor () {
         super(url);
 
-        this.generalEndpoint = this.route('GET', '/general-endpoint/:resourceId?', (ctx) => {
+        this.generalEndpoint = this.get('/general-endpoint/:resourceId?', (ctx) => {
             ctx.body = { endpoint: 1 };
         });
 

@@ -87,16 +87,17 @@ class MockServer {
     /**
      * Adds one-time handler. First request to the 'method' and 'path' will be processed by the handler and cause
      * the handler removal.
-     * The handlers registered using 'handleNext' method has precedence over handlers registered via the 'handle' method
+     * The handlers registered using 'handleNext' method has precedence over handlers registered via the '_handle' method
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      *
      * @param {IMethod} method
      * @param {string} path
+     * @param {Function} matcher
      * @param {IHandler} [handler]
      * @returns {IChecker} Returns function that checks the route was requested and the handler responded without error.
      */
-    handleNext (method, path, handler = (ctx, next) => next()) {
+    _handleNext (method, path, matcher, handler = (ctx, next) => next()) {
 
         let requestReceived = false;
         let error;
@@ -104,7 +105,7 @@ class MockServer {
         let rejectPromise;
         let promiseUsed = false;
 
-        const cancel = this._addOnetimeHandler(method, path, async (ctx, next) => {
+        const cancel = this._addOnetimeHandler(method, path, matcher,async (ctx, next) => {
             requestReceived = true;
             try {
                 await handler(ctx, next);
@@ -140,6 +141,7 @@ class MockServer {
         for (const method of ['then', 'catch', 'finally']) {
             checker[method] = (...args) => {
                 if (!promiseUsed) {
+                    checker.unregister();
                     promiseUsed = true;
                     if (error) {
                         rejectPromise(error);
@@ -154,20 +156,10 @@ class MockServer {
         return checker;
     }
 
-    /**
-     * Adds one-time check. The checker will fail in case of any request to the method and path.
-     * The checks registered using 'notReceive' method.
-     * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
-     * and cause the handler removal.
-     *
-     * @param {IMethod} method
-     * @param {string} path
-     * @returns {IChecker} Returns function that checks the route was NOT requested.
-     */
-    notReceive (method, path) {
+    _notReceive (method, path, matcher) {
         let error;
 
-        const cancel = this._addOnetimeHandler(method, path, async (ctx, next) => {
+        const cancel = this._addOnetimeHandler(method, path, matcher,async (ctx, next) => {
             error = new Error(`Mock api received unexpected ${method.toUpperCase()} request to '${path}' path`);
             next();
         });
@@ -194,8 +186,9 @@ class MockServer {
      * @param {IMethod} method
      * @param {string} path
      * @param {IHandler} handler
+     * @private
      */
-    handle (method, path, handler) {
+    _handle (method, path, handler) {
         this._commonHanlersRouter[method.toLowerCase()](path, handler);
     }
 
@@ -208,6 +201,51 @@ class MockServer {
     }
 
     /**
+     * @param {string} path
+     * @param {IHandler} [defaultHandler]
+     * @returns {Route}
+     */
+    get (path, defaultHandler) {
+        return this.route('GET', path, defaultHandler);
+    }
+
+    /**
+     * @param {string} path
+     * @param {IHandler} [defaultHandler]
+     * @returns {Route}
+     */
+    post (path, defaultHandler) {
+        return this.route('POST', path, defaultHandler);
+    }
+
+    /**
+     * @param {string} path
+     * @param {IHandler} [defaultHandler]
+     * @returns {Route}
+     */
+    put (path, defaultHandler) {
+        return this.route('PUT', path, defaultHandler);
+    }
+
+    /**
+     * @param {string} path
+     * @param {IHandler} [defaultHandler]
+     * @returns {Route}
+     */
+    patch (path, defaultHandler) {
+        return this.route('PATCH', path, defaultHandler);
+    }
+
+    /**
+     * @param {string} path
+     * @param {IHandler} [defaultHandler]
+     * @returns {Route}
+     */
+    delete (path, defaultHandler) {
+        return this.route('DELETE', path, defaultHandler);
+    }
+
+    /**
      * @param {IMethod} method
      * @param {string} path
      * @param {IHandler} [defaultHandler]
@@ -216,27 +254,34 @@ class MockServer {
     route (method, path, defaultHandler) {
 
         if (defaultHandler) {
-            this.handle(method, path, defaultHandler);
+            this._handle(method, path, defaultHandler);
         }
 
         return new Route(this, method, path);
     }
 
     _registerChecker (callback) {
-        const checker = () => {
+
+        const unregister = () => {
             const indexOfChecker = this._pendingCheckers.indexOf(checker);
             if (indexOfChecker >= 0) {
                 this._pendingCheckers.splice(indexOfChecker, 1);
             }
+        };
+
+        const checker = () => {
+            unregister();
             callback();
         };
+
+        checker.unregister = unregister;
 
         this._pendingCheckers.push(checker);
 
         return checker;
     }
 
-    _addOnetimeHandler (method, path, handler, matcher = null) {
+    _addOnetimeHandler (method, path, matcher, handler) {
 
         let pending = true;
         const disableHandler = () => (pending = false);
@@ -251,7 +296,7 @@ class MockServer {
                 return next();
             }
 
-            if (matcher && !(await matcher(ctx))) {
+            if (!(await matcher(ctx))) {
                 return next();
             }
 
