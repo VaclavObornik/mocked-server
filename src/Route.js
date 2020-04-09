@@ -1,5 +1,6 @@
 'use strict';
 
+const isMatch = require('lodash.ismatch');
 
 class Route {
 
@@ -25,6 +26,22 @@ class Route {
             ...this._matchers,
             matcher
         ]);
+    }
+
+    /**
+     * @param {Object} matcher - accepts ctx and should return true or false
+     * @returns {Route} Conditional route
+     */
+    matchingParams (matcher) {
+        return this.matching((ctx) => isMatch(ctx.params, matcher));
+    }
+
+    /**
+     * @param {Function} matcher - accepts ctx and should return true or false
+     * @returns {Route} Conditional route
+     */
+    matchingQuery (matcher) {
+        return this.matching((ctx) => isMatch(ctx.query, matcher));
     }
 
     /**
