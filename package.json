@@ -4,7 +4,8 @@
   "description": "Utility for mocking remote APIs servers for testing purposes",
   "main": "src/MockedServer.js",
   "scripts": {
-    "test": "mocha test --recursive"
+    "test": "mocha",
+    "test:stryker": "stryker run"
   },
   "repository": {
     "type": "git",
@@ -27,7 +28,11 @@
   "dependencies": {
     "koa": "^2.6.2",
     "koa-bodyparser": "^4.2.1",
-    "koa-router": "^8.0.6"
+    "koa-router": "^8.0.6",
+    "@stryker-mutator/core": "^3.1.0",
+    "@stryker-mutator/javascript-mutator": "^3.1.0",
+    "@stryker-mutator/mocha-framework": "^3.1.0",
+    "@stryker-mutator/mocha-runner": "^3.1.0"
   },
   "peerDependencies": {
     "mocha": "*"
