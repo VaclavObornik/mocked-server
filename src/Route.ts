@@ -1,38 +1,27 @@
-'use strict';
+import {AwaitableChecker, Checker, Matcher, Method, Path} from './types';
+
+import MockServer from "./MockedServer";
+import { Context, Middleware } from 'koa';
 
 
-class Route {
+export default class Route {
 
-    /**
-     * @param {MockServer} mockServer
-     * @param {IMethod} method
-     * @param {string} path
-     * @param {Function[]} matchers
-     */
-    constructor (mockServer, method, path, matchers = []) {
-        this._mockServer = mockServer;
-        this._method = method;
-        this._path = path;
-        this._matchers = matchers;
-    }
+    constructor (
+        private _mockServer: MockServer,
+        private _method: Method,
+        private _path: Path,
+        private _matchers: Matcher[] = []
+    ) {}
 
-    /**
-     * @param {Function} matcher - accepts ctx and should return true or false
-     * @returns {Route} Conditional route
-     */
-    matching (matcher) {
+    matching (matcher: Matcher) {
         return new Route(this._mockServer, this._method, this._path, [
             ...this._matchers,
             matcher
         ]);
     }
 
-    /**
-     * @returns {Function}
-     * @private
-     */
-    _getSingleMatcher () {
-        return async (ctx) => {
+    _getSingleMatcher (): Matcher {
+        return async (ctx: Context) => {
             for (const matcher of this._matchers) {
                 if (!(await matcher(ctx))) {
                     return false;
@@ -48,11 +37,8 @@ class Route {
      * The handlers registered using 'handleNext' method has precedence over handlers registered via the '_handle' method
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
-     *
-     * @param {IHandler} [handler]
-     * @returns {IChecker}
      */
-    handleNext (handler) {
+    handleNext (handler?: Middleware): AwaitableChecker {
         return this._mockServer._handleNext(this._method, this._path, this._getSingleMatcher(), handler);
     }
 
@@ -62,12 +48,10 @@ class Route {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      *
-     * @returns {IChecker} Returns function that checks the route was NOT requested.
+     * @returns Returns function that checks the route was NOT requested.
      */
-    notReceive () {
+    notReceive (): Checker {
         return this._mockServer._notReceive(this._method, this._path, this._getSingleMatcher());
     }
 }
-
-module.exports = Route;
 
