@@ -1,58 +1,57 @@
-'use strict';
 
-const url = require('url');
-const Koa = require('koa');
-const Router = require('koa-router');
-const bodyParser = require('koa-bodyparser');
-const mocha = require('mocha');
-const Route = require('./Route');
+import url from 'url';
+import Koa, {Context, Middleware, Next, ParameterizedContext} from 'koa';
+import Router from 'koa-router';
+import bodyParser from 'koa-bodyparser';
+import mocha from 'mocha';
+import Route from './Route';
+import {AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, Matcher, Method, Path} from './types';
+import {Server} from "http";
 
+export default class MockServer {
 
-/** @typedef {'GET'|'PUT'|'POST'|'PATCH'|'DELETE'|'DEL'} IMethod */
+    private readonly _port: number;
 
-/**
- * @callback IHandler
- * @param {*} ctx
- * @param {Function} next
- */
+    private readonly _app: Koa = new Koa();
 
-/**
- * @callback IChecker
- * @throws
- */
+    private _pendingCheckers = new Array<Checker>();
 
-class MockServer {
+    private _nextHandledRequests = new WeakMap<Context, Context>();
+
+    private _nextHandlersRouter = new Router();
+
+    private _commonHandlersRouter = new Router();
 
     /**
      * @param {string|number} urlOrPort
      */
-    constructor (urlOrPort) {
+    constructor (urlOrPort: string|number) {
 
         if (typeof urlOrPort === 'number') {
             this._port = urlOrPort;
 
         } else {
             const parsed = url.parse(urlOrPort);
+
+            if (!parsed.port) {
+                throw new Error('URL does not contains port number');
+            }
+
             this._port = parseInt(parsed.port);
         }
 
-        this._app = new Koa();
         this._app.use(bodyParser({
             enableTypes: ['json', 'form', 'text'],
             extendTypes: {
-                text: 'text/xml'
+                text: ['text/xml']
             }
         }));
 
-        this._pendingCheckers = [];
-        this._nextHandledRequests = new WeakMap();
-        this._nextHandlersRouter = new Router();
-        this._app.use(async (ctx, next) => {
-            await this._nextHandlersRouter.routes()(ctx, next);
+        this._app.use(async (ctx: Context, next: Next) => {
+            await this._nextHandlersRouter.routes()(ctx as any, next);
         });
 
-        this._commonHanlersRouter = new Router();
-        this._app.use(this._commonHanlersRouter.routes());
+        this._app.use(this._commonHandlersRouter.routes());
 
         this._app.use((ctx) => {
             const error = new Error(`No handler match the "[${ctx.request.method}] ${ctx.request.path}" request`);
@@ -65,7 +64,7 @@ class MockServer {
 
     _bindMocha () {
 
-        let server;
+        let server: Server;
         mocha.before((done) => {
             server = this._app.listen(this._port, () => done());
         });
@@ -79,6 +78,7 @@ class MockServer {
             try {
                 runAllCheckers();
             } catch (err) {
+                // @ts-ignore
                 this.test.error(err);
             }
         });
@@ -91,40 +91,45 @@ class MockServer {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      *
-     * @param {IMethod} method
-     * @param {string} path
-     * @param {Function} matcher
-     * @param {IHandler} [handler]
      * @returns {IChecker} Returns function that checks the route was requested and the handler responded without error.
      */
-    _handleNext (method, path, matcher, handler = (ctx, next) => next()) {
+    _handleNext (
+        method: Method,
+        path: Path,
+        matcher: Matcher,
+        handler: Middleware = (ctx, next) => next()
+    ): AwaitableChecker {
 
         let requestReceived = false;
-        let error;
-        let resolvePromise;
-        let rejectPromise;
-        let promiseUsed = false;
+        let error: Error;
+        let wasPromiseUsed = false;
+        let resolvePromise: (value?: unknown) => void;
+        let rejectPromise: (error: Error) => void;
+        const promise = new Promise((resolve, reject) => {
+            resolvePromise = resolve;
+            rejectPromise = reject;
+        });
 
         const cancel = this._addOnetimeHandler(method, path, matcher,async (ctx, next) => {
             requestReceived = true;
             try {
                 await handler(ctx, next);
-                if (promiseUsed) {
+                if (wasPromiseUsed) {
                     resolvePromise();
                 }
             } catch (handleError) {
                 error = handleError;
-                if (promiseUsed) {
+                if (wasPromiseUsed) {
                     rejectPromise(error);
                 }
             }
         });
 
-        const checker = this._registerChecker(() => {
+        const { checker, unregister } = this._registerChecker(() => {
             cancel();
             if (!requestReceived) {
                 error = new Error(`Mock api didn't receive expected ${method.toUpperCase()} request to '${path}' path.`);
-                if (promiseUsed) {
+                if (wasPromiseUsed) {
                     rejectPromise(error);
                 }
             }
@@ -133,35 +138,29 @@ class MockServer {
             }
         });
 
-        const promise = new Promise((resolve, reject) => {
-            resolvePromise = resolve;
-            rejectPromise = reject;
-        });
 
-        for (const method of ['then', 'catch', 'finally']) {
-            checker[method] = (...args) => {
-                if (!promiseUsed) {
-                    checker.unregister();
-                    promiseUsed = true;
+        return Object.assign(checker, {
+            then (onfulfilled?: (value: any) => any, onrejected?: (reason: any) => never | any) {
+                if (!wasPromiseUsed) {
+                    unregister();
+                    wasPromiseUsed = true;
                     if (error) {
                         rejectPromise(error);
                     } else if (requestReceived) {
                         resolvePromise();
                     }
                 }
-                return promise[method](...args);
-            };
-        }
-
-        return checker;
+                return promise.then(onfulfilled, onrejected);
+            }
+        });
     }
 
-    _notReceive (method, path, matcher) {
-        let error;
+    _notReceive (method: Method, path: Path, matcher: Matcher): Checker {
+        let error: Error;
 
         const cancel = this._addOnetimeHandler(method, path, matcher,async (ctx, next) => {
             error = new Error(`Mock api received unexpected ${method.toUpperCase()} request to '${path}' path`);
-            next();
+            return next();
         });
 
         return this._registerChecker(() => {
@@ -169,7 +168,7 @@ class MockServer {
             if (error) {
                 throw error;
             }
-        });
+        }).checker;
     }
 
     /**
@@ -182,14 +181,10 @@ class MockServer {
 
     /**
      * Add general handler that respond to all method and path requests.
-     *
-     * @param {IMethod} method
-     * @param {string} path
-     * @param {IHandler} handler
-     * @private
      */
-    _handle (method, path, handler) {
-        this._commonHanlersRouter[method.toLowerCase()](path, handler);
+    _handle (method: Method, path: Path, handler: Middleware): void {
+        this._commonHandlersRouter[this._lowercaseMethod(method)](path, handler);
+        this._commonHandlersRouter['put'](path, handler);
     }
 
     /**
@@ -200,58 +195,47 @@ class MockServer {
         this._pendingCheckers = [];
     }
 
-    /**
-     * @param {string} path
-     * @param {IHandler} [defaultHandler]
-     * @returns {Route}
-     */
-    get (path, defaultHandler) {
+    get (path: Path, defaultHandler?: DefaultHandler) {
         return this.route('GET', path, defaultHandler);
     }
 
-    /**
-     * @param {string} path
-     * @param {IHandler} [defaultHandler]
-     * @returns {Route}
-     */
-    post (path, defaultHandler) {
+    post (path: Path, defaultHandler?: DefaultHandler) {
         return this.route('POST', path, defaultHandler);
     }
 
-    /**
-     * @param {string} path
-     * @param {IHandler} [defaultHandler]
-     * @returns {Route}
-     */
-    put (path, defaultHandler) {
+    put (path: Path, defaultHandler?: DefaultHandler) {
         return this.route('PUT', path, defaultHandler);
     }
 
-    /**
-     * @param {string} path
-     * @param {IHandler} [defaultHandler]
-     * @returns {Route}
-     */
-    patch (path, defaultHandler) {
+    patch (path: Path, defaultHandler?: DefaultHandler) {
         return this.route('PATCH', path, defaultHandler);
     }
 
-    /**
-     * @param {string} path
-     * @param {IHandler} [defaultHandler]
-     * @returns {Route}
-     */
-    delete (path, defaultHandler) {
+    delete (path: Path, defaultHandler?: DefaultHandler) {
         return this.route('DELETE', path, defaultHandler);
     }
 
-    /**
-     * @param {IMethod} method
-     * @param {string} path
-     * @param {IHandler} [defaultHandler]
-     * @returns {Route}
-     */
-    route (method, path, defaultHandler) {
+    link (path: Path, defaultHandler?: DefaultHandler) {
+        return this.route('LINK', path, defaultHandler);
+    }
+
+    unlink (path: Path, defaultHandler?: DefaultHandler) {
+        return this.route('UNLINK', path, defaultHandler);
+    }
+
+    head (path: Path, defaultHandler?: DefaultHandler) {
+        return this.route('HEAD', path, defaultHandler);
+    }
+
+    options (path: Path, defaultHandler?: DefaultHandler) {
+        return this.route('OPTIONS', path, defaultHandler);
+    }
+
+    all (path: Path, defaultHandler?: DefaultHandler) {
+        return this.route('ALL', path, defaultHandler);
+    }
+
+    route (method: Method, path: Path, defaultHandler?: Middleware): Route {
 
         if (defaultHandler) {
             this._handle(method, path, defaultHandler);
@@ -260,7 +244,7 @@ class MockServer {
         return new Route(this, method, path);
     }
 
-    _registerChecker (callback) {
+    _registerChecker (callback: Function): { checker: Checker, unregister: () => void } {
 
         const unregister = () => {
             const indexOfChecker = this._pendingCheckers.indexOf(checker);
@@ -274,19 +258,21 @@ class MockServer {
             callback();
         };
 
-        checker.unregister = unregister;
-
         this._pendingCheckers.push(checker);
 
-        return checker;
+        return { checker, unregister };
     }
 
-    _addOnetimeHandler (method, path, matcher, handler) {
+    _lowercaseMethod (method: Method): LowercasedMethod {
+        return method.toLowerCase() as LowercasedMethod;
+    }
+
+    _addOnetimeHandler (method: Method, path: Path, matcher: Matcher, handler: Middleware) {
 
         let pending = true;
         const disableHandler = () => (pending = false);
 
-        this._nextHandlersRouter[method.toLowerCase()](path, async (ctx, next) => {
+        this._nextHandlersRouter[this._lowercaseMethod(method)](path, async (ctx, next) => {
 
             if (!pending) {
                 return next();
@@ -310,4 +296,3 @@ class MockServer {
 
 }
 
-module.exports = MockServer;

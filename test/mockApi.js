@@ -1,6 +1,6 @@
 'use strict';
 
-const MockedServer = require('../src/MockedServer');
+const MockedServer = require('../'); // todo how to get rid of default?
 const { url } = require('./mockApiUrlAndPort');
 
 class MockApi extends MockedServer {

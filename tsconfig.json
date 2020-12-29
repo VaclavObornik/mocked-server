@@ -1,0 +1,12 @@
+{
+    "extends": "@tsconfig/node14/tsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        "outDir": "dist",
+        "sourceMap": true,
+        "newLine": "lf"
+    },
+    "include": [
+      "src/**/*"
+    ]
+}
