@@ -48,10 +48,15 @@ export default class MockServer {
         }));
 
         this._app.use(async (ctx: Context, next: Next) => {
-            await this._nextHandlersRouter.routes()(ctx as any, next);
-        });
 
-        this._app.use(this._commonHandlersRouter.routes());
+            const routerForRequest = new Router();
+            routerForRequest.use(
+                this._nextHandlersRouter.routes(),
+                this._commonHandlersRouter.routes()
+            );
+
+            await routerForRequest.routes()(ctx as any, next);
+        });
 
         this._app.use((ctx) => {
             const error = new Error(`No handler match the "[${ctx.request.method}] ${ctx.request.path}" request`);

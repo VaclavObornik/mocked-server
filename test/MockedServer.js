@@ -50,6 +50,16 @@ describe('handleNext', () => {
             .expect(200, { endpoint: 1 });
     });
 
+
+    it('should propagate parsed params to default handler', async () => {
+        await request.get('/general-endpoint/111')
+            .expect(mockApi.generalEndpoint.handleNext(async (ctx, next) => {
+                assert.strictEqual(ctx.params.resourceId, '111');
+                await next();
+                assert.strictEqual(ctx.state.paramsInDefaultHandler.resourceId, '111');
+            }));
+    });
+
     it('should not forward request to a next handleNext handler', async () => {
 
         const handleNextCheck1 = mockApi.generalEndpoint.handleNext();

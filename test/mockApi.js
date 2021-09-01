@@ -9,6 +9,7 @@ class MockApi extends MockedServer {
         super(url);
 
         this.generalEndpoint = this.get('/general-endpoint/:resourceId?', (ctx) => {
+            ctx.state.paramsInDefaultHandler = ctx.params;
             ctx.body = { endpoint: 1 };
         });
 
