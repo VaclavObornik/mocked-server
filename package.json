@@ -1,6 +1,6 @@
 {
   "name": "mocked-server",
-  "version": "5.1.1",
+  "version": "5.1.2",
   "description": "Utility for mocking remote APIs servers for testing purposes",
   "main": "./index.js",
   "types": "./dist/MockedServer.d.ts",
