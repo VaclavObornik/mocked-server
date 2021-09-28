@@ -20,7 +20,7 @@ export default class Route {
         ]);
     }
 
-    _getSingleMatcher (): Matcher {
+    private _getSingleMatcher (): Matcher {
         return async (ctx: Context) => {
             for (const matcher of this._matchers) {
                 if (!(await matcher(ctx))) {

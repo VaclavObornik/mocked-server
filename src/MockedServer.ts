@@ -119,6 +119,7 @@ export default class MockServer {
      * and cause the handler removal.
      *
      * @returns {AwaitableChecker} Returns function that checks the route was requested and the handler responded without error.
+     * @internal
      */
     _handleNext (
         method: Method,
@@ -182,6 +183,7 @@ export default class MockServer {
         });
     }
 
+    /** @internal */
     _notReceive (method: Method, path: Path, matcher: Matcher): Checker {
         let error: Error;
 
