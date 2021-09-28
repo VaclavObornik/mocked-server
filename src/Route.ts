@@ -2,6 +2,7 @@ import {AwaitableChecker, Checker, Matcher, Method, Path} from './types';
 
 import MockServer from "./MockedServer";
 import { Context, Middleware } from 'koa';
+import { ComposedMiddleware } from "koa-compose";
 
 
 export default class Route {
@@ -38,8 +39,8 @@ export default class Route {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      */
-    handleNext (handler?: Middleware): AwaitableChecker {
-        return this._mockServer._handleNext(this._method, this._path, this._getSingleMatcher(), handler);
+    handleNext <T>(handler?: Middleware<T>): AwaitableChecker {
+        return this._mockServer._handleNext<T>(this._method, this._path, this._getSingleMatcher(), handler);
     }
 
     /**

@@ -121,11 +121,11 @@ export default class MockServer {
      * @returns {AwaitableChecker} Returns function that checks the route was requested and the handler responded without error.
      * @internal
      */
-    _handleNext (
+    _handleNext<T> (
         method: Method,
         path: Path,
         matcher: Matcher,
-        handler: Middleware = (ctx, next) => next()
+        handler: Middleware<T> = (ctx, next) => next()
     ): AwaitableChecker {
 
         let requestReceived = false;
@@ -146,7 +146,7 @@ export default class MockServer {
                     resolvePromise();
                 }
             } catch (handleError) {
-                error = handleError;
+                error = handleError as Error;
                 if (wasPromiseUsed) {
                     rejectPromise(error);
                 }
