@@ -1,6 +1,6 @@
 
 import url from 'url';
-import Koa, {Context, Middleware, Next, ParameterizedContext} from 'koa';
+import Koa, {Context, Middleware, Next} from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
 import mocha from 'mocha';
@@ -64,10 +64,15 @@ export default class MockServer {
             ctx.body = { error: error.toString() };
         });
 
-        this._bindMocha();
+        if (mocha && 'before' in mocha) {
+            this._bindMocha();
+
+        } else if ('beforeAll' in global) {
+            this._bindJest();
+        }
     }
 
-    _bindMocha () {
+    private _bindMocha () {
 
         let server: Server;
         mocha.before((done) => {
@@ -89,6 +94,23 @@ export default class MockServer {
         });
     }
 
+    private _bindJest () {
+
+        let server: Server;
+        global.beforeAll((done) => {
+            server = this._app.listen(this._port, () => done());
+        });
+
+        global.afterAll(() => server && server.close());
+
+        global.beforeEach(() => this.reset());
+
+        const runAllCheckers = this.runAllCheckers.bind(this);
+        global.afterEach(function () {
+            runAllCheckers();
+        });
+    }
+
     /**
      * Adds one-time handler. First request to the 'method' and 'path' will be processed by the handler and cause
      * the handler removal.
@@ -96,7 +118,7 @@ export default class MockServer {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      *
-     * @returns {IChecker} Returns function that checks the route was requested and the handler responded without error.
+     * @returns {AwaitableChecker} Returns function that checks the route was requested and the handler responded without error.
      */
     _handleNext (
         method: Method,
@@ -187,7 +209,7 @@ export default class MockServer {
     /**
      * Add general handler that respond to all method and path requests.
      */
-    _handle (method: Method, path: Path, handler: Middleware): void {
+    private _handle (method: Method, path: Path, handler: Middleware): void {
         this._commonHandlersRouter[this._lowercaseMethod(method)](path, handler);
         this._commonHandlersRouter['put'](path, handler);
     }
@@ -249,7 +271,7 @@ export default class MockServer {
         return new Route(this, method, path);
     }
 
-    _registerChecker (callback: Function): { checker: Checker, unregister: () => void } {
+    private _registerChecker (callback: Function): { checker: Checker, unregister: () => void } {
 
         const unregister = () => {
             const indexOfChecker = this._pendingCheckers.indexOf(checker);
@@ -268,11 +290,11 @@ export default class MockServer {
         return { checker, unregister };
     }
 
-    _lowercaseMethod (method: Method): LowercasedMethod {
+    private _lowercaseMethod (method: Method): LowercasedMethod {
         return method.toLowerCase() as LowercasedMethod;
     }
 
-    _addOnetimeHandler (method: Method, path: Path, matcher: Matcher, handler: Middleware) {
+    private _addOnetimeHandler (method: Method, path: Path, matcher: Matcher, handler: Middleware) {
 
         let pending = true;
         const disableHandler = () => (pending = false);
