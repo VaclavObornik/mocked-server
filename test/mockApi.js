@@ -1,6 +1,6 @@
 'use strict';
 
-const MockedServer = require('../dist').default;
+const MockedServer = require('../dist');
 const { url } = require('./mockApiUrlAndPort');
 
 class MockApi extends MockedServer {
