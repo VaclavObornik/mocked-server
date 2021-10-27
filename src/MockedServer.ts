@@ -4,11 +4,11 @@ import Koa, {Context, Middleware, Next} from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
 import mocha from 'mocha';
-import Route from './Route';
+import { Route } from './Route';
 import {AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, Matcher, Method, Path} from './types';
 import {Server} from "http";
 
-export default class MockServer {
+export class MockServer {
 
     private readonly _port: number;
 

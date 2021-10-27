@@ -2,8 +2,8 @@
   "name": "mocked-server",
   "version": "5.2.2",
   "description": "Utility for mocking remote APIs servers for testing purposes",
-  "main": "./index.js",
-  "types": "./dist/MockedServer.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "rimraf dist && tsc",
     "dev": "tsc --watch",
