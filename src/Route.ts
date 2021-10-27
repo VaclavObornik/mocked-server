@@ -1,11 +1,10 @@
 import {AwaitableChecker, Checker, Matcher, Method, Path} from './types';
 
-import MockServer from "./MockedServer";
+import { MockServer } from "./MockServer";
 import { Context, Middleware } from 'koa';
-import { ComposedMiddleware } from "koa-compose";
 
 
-export default class Route {
+export class Route {
 
     constructor (
         private _mockServer: MockServer,

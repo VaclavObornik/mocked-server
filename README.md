@@ -3,13 +3,13 @@
 
 Mock server built with real testing needs in mind.
 
-The ``mocha`` test runner is needed to be used as the MockedServer automatically binds "checkers" to test all assertions were fulfilled during all tests.
+The ``mocha`` or ``jest`` test runner is needed to be used as the MockedServer automatically binds "checkers" to test all assertions were fulfilled during all tests.
 The MockedServer uses Koa inside for routing and request handling, so you write Koa-like request handlers.
 
 ## Example
 
 ```javascript
-const MockedServer = require('mocked-server');
+const { MockServer } = require('mocked-server');
 
 class SomeService extends MockedServer {
     
