@@ -38,8 +38,21 @@ export class Route {
      * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
      * and cause the handler removal.
      */
-    handleNext <T>(handler?: Middleware<T>): AwaitableChecker {
-        return this._mockServer._handleNext<T>(this._method, this._path, this._getSingleMatcher(), handler);
+    handleNext <T>(handler?: Middleware<T>): Checker {
+        return this._mockServer._handleNext<T>(this._method, this._path, this._getSingleMatcher(), handler, false);
+    }
+
+    /**
+     * Adds one-time handler. First request to the 'method' and 'path' will be processed by the handler and cause
+     * the handler removal.
+     * The handlers registered using 'handleNext' method has precedence over handlers registered via the '_handle' method
+     * Returned function can be used to manual check. Function will throw in case of the handler did not receive request
+     * and cause the handler removal.
+     * The function is also thenable/awaitable - if then/await is applied, the returned Promise will be resolved after
+     * request come
+     */
+    waitForNext <T>(handler?: Middleware<T>): AwaitableChecker {
+        return this._mockServer._handleNext<T>(this._method, this._path, this._getSingleMatcher(), handler, true);
     }
 
     /**

@@ -123,7 +123,7 @@ describe('handleNext', () => {
             await request.get('/general-endpoint');
         }, interval);
 
-        await mockApi.generalEndpoint.handleNext((ctx) => {
+        await mockApi.generalEndpoint.waitForNext((ctx) => {
             ctx.body = {};
             ctx.status = 200;
         });
@@ -144,7 +144,7 @@ describe('handleNext', () => {
 
         await assert.rejects(
             async () => {
-                checker = mockApi.generalEndpoint.handleNext(() => {
+                checker = mockApi.generalEndpoint.waitForNext(() => {
                     throw new Error('Bad request');
                 });
 

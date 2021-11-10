@@ -121,12 +121,9 @@ export class MockServer {
      * @returns {AwaitableChecker} Returns function that checks the route was requested and the handler responded without error.
      * @internal
      */
-    _handleNext<T> (
-        method: Method,
-        path: Path,
-        matcher: Matcher,
-        handler: Middleware<T> = (ctx, next) => next()
-    ): AwaitableChecker {
+    _handleNext<T> (method: Method, path: Path, matcher: Matcher, handler: Middleware<T>|undefined, promiseLike: true): AwaitableChecker;
+    _handleNext<T> (method: Method, path: Path, matcher: Matcher, handler: Middleware<T>|undefined, promiseLike: false): Checker;
+    _handleNext<T> (method: Method, path: Path, matcher: Matcher, handler: Middleware<T> = (ctx, next) => next(), promiseLike: boolean): AwaitableChecker | Checker {
 
         let requestReceived = false;
         let error: Error;
@@ -165,6 +162,10 @@ export class MockServer {
                 throw error;
             }
         });
+
+        if (!promiseLike) {
+            return checker;
+        }
 
 
         return Object.assign(checker, {

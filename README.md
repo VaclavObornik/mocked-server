@@ -146,7 +146,7 @@ describe('testedProcedure', () => {
      */
     it('should not call the endpoint', async () => {
         setTimeout(() => testedProcedure(), 1000);
-        await myServer.endpoint.handleNext(); // by the 'await', we can wait for the next endpoint call
+        await myServer.endpoint.waitForNext(); // by the 'await', we can wait for the next endpoint call
                                               // it will throw in case the handler throws an error (i.e., an assertion error)
                                               // if the endpoint is not called, the test will time out
         // ...rest of the test
