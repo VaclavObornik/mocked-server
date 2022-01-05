@@ -3,10 +3,9 @@ import url from 'url';
 import Koa, {Context, Middleware, Next} from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
-import mocha from 'mocha';
 import { Route } from './Route';
 import {AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, Matcher, Method, Path} from './types';
-import {Server} from "http";
+import { Server } from "http";
 
 export class MockServer {
 
@@ -64,7 +63,7 @@ export class MockServer {
             ctx.body = { error: error.toString() };
         });
 
-        if (mocha && 'before' in mocha) {
+        if ('beforeEach' in global) {
             this._bindMocha();
 
         } else if ('beforeAll' in global) {
@@ -75,16 +74,16 @@ export class MockServer {
     private _bindMocha () {
 
         let server: Server;
-        mocha.before((done) => {
+        global.before((done) => {
             server = this._app.listen(this._port, () => done());
         });
 
-        mocha.after(() => server && server.close());
+        global.after(() => server && server.close());
 
-        mocha.beforeEach(() => this.reset());
+        global.beforeEach(() => this.reset());
 
         const runAllCheckers = this.runAllCheckers.bind(this);
-        mocha.afterEach(function () {
+        global.afterEach(function () {
             try {
                 runAllCheckers();
             } catch (err) {
