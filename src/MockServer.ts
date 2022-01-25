@@ -6,8 +6,13 @@ import bodyParser from 'koa-bodyparser';
 import { Route } from './Route';
 import {AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, Matcher, Method, Path} from './types';
 import { Server } from "http";
+import * as http from "http";
 
 export class MockServer {
+
+    private readonly _readyPromise: Promise<void>;
+
+    private server: Server;
 
     private readonly _port: number;
 
@@ -20,6 +25,10 @@ export class MockServer {
     private _nextHandlersRouter = new Router();
 
     private _commonHandlersRouter = new Router();
+
+    public get readyPromise (): Promise<void> {
+        return this._readyPromise;
+    }
 
     /**
      * @param {string|number} urlOrPort
@@ -63,6 +72,16 @@ export class MockServer {
             ctx.body = { error: error.toString() };
         });
 
+        this.server = http.createServer(this._app.callback())
+
+        this._readyPromise = new Promise<void>((resolve, reject) => {
+            this.server.on('error', reject); // typically EADDRINUSE
+            this.server.listen(this._port, () => {
+                this.server.removeListener('error', reject);
+                resolve();
+            });
+        });
+
         if ('beforeEach' in global) {
             this._bindMocha();
 
@@ -74,11 +93,9 @@ export class MockServer {
     private _bindMocha () {
 
         let server: Server;
-        global.before((done) => {
-            server = this._app.listen(this._port, () => done());
-        });
+        global.before(() => this.readyPromise);
 
-        global.after(() => server && server.close());
+        global.after(() => this.server.close());
 
         global.beforeEach(() => this.reset());
 
@@ -95,12 +112,9 @@ export class MockServer {
 
     private _bindJest () {
 
-        let server: Server;
-        global.beforeAll((done) => {
-            server = this._app.listen(this._port, () => done());
-        });
+        global.beforeAll(() => this.readyPromise);
 
-        global.afterAll(() => server && server.close());
+        global.afterAll(() => this.server.close());
 
         global.beforeEach(() => this.reset());
 
