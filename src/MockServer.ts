@@ -92,7 +92,6 @@ export class MockServer {
 
     private _bindMocha () {
 
-        let server: Server;
         global.before(() => this.readyPromise);
 
         global.after(() => this.server.close());
