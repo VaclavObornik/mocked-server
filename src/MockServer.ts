@@ -82,7 +82,7 @@ export class MockServer {
             });
         });
 
-        if ('beforeEach' in global) {
+        if ('before' in global) {
             this._bindMocha();
 
         } else if ('beforeAll' in global) {
