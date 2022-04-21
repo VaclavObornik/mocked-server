@@ -31,10 +31,6 @@
   },
   "homepage": "https://github.com/VaclavObornik/mocked-server#readme",
   "dependencies": {
-    "@stryker-mutator/core": "^5.5.1",
-    "@stryker-mutator/javascript-mutator": "^4.0.0",
-    "@stryker-mutator/mocha-framework": "^3.1.0",
-    "@stryker-mutator/mocha-runner": "^5.5.1",
     "@types/koa": "^2.11.6",
     "@types/koa-bodyparser": "^4.3.3",
     "@types/koa-router": "^7.4.1",
@@ -43,9 +39,14 @@
     "koa-router": "^10.1.1"
   },
   "optionalDependencies": {
-    "mocha": "*"
+    "mocha": "*",
+    "jest": "*"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^5.5.1",
+    "@stryker-mutator/javascript-mutator": "^4.0.0",
+    "@stryker-mutator/mocha-framework": "^3.1.0",
+    "@stryker-mutator/mocha-runner": "^5.5.1",
     "@tsconfig/node14": "^1.0.0",
     "@types/jest": "^27.0.2",
     "@types/mocha": "^9.0.0",
