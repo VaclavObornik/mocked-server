@@ -4,13 +4,14 @@ import Koa, {Context, Middleware, Next} from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
 import { Route } from './Route';
-import {AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, Matcher, Method, Path} from './types';
+import { getSettings } from './getSettings';
+import { AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, Matcher, Method, Path } from './types';
 import { Server } from "http";
 import * as http from "http";
 
 export class MockServer {
 
-    private readonly _readyPromise: Promise<void>;
+    public readonly readyPromise: Promise<void>;
 
     private server: Server;
 
@@ -25,10 +26,6 @@ export class MockServer {
     private _nextHandlersRouter = new Router();
 
     private _commonHandlersRouter = new Router();
-
-    public get readyPromise (): Promise<void> {
-        return this._readyPromise;
-    }
 
     /**
      * @param {string|number} urlOrPort
@@ -74,7 +71,7 @@ export class MockServer {
 
         this.server = http.createServer(this._app.callback())
 
-        this._readyPromise = new Promise<void>((resolve, reject) => {
+        this.readyPromise = new Promise<void>((resolve, reject) => {
             this.server.on('error', reject); // typically EADDRINUSE
             this.server.listen(this._port, () => {
                 this.server.removeListener('error', reject);
@@ -82,24 +79,28 @@ export class MockServer {
             });
         });
 
-        if ('before' in global) {
+        const settings = getSettings();
+
+        if (settings.testRunner === 'mocha') {
             this._bindMocha();
 
-        } else if ('beforeAll' in global) {
+        } else if (settings.testRunner === 'jest') {
             this._bindJest();
         }
     }
 
     private _bindMocha () {
 
-        global.before(() => this.readyPromise);
+        const mocha = require('mocha');
 
-        global.after(() => this.server.close());
+        mocha.before(() => this.readyPromise);
 
-        global.beforeEach(() => this.reset());
+        mocha.after(() => this.server.close());
+
+        mocha.beforeEach(() => this.reset());
 
         const runAllCheckers = this.runAllCheckers.bind(this);
-        global.afterEach(function () {
+        mocha.afterEach(function () {
             try {
                 runAllCheckers();
             } catch (err) {
@@ -110,6 +111,8 @@ export class MockServer {
     }
 
     private _bindJest () {
+
+        const jest = require('@jest/globals');
 
         global.beforeAll(() => this.readyPromise);
 
