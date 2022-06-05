@@ -25,11 +25,12 @@ export function getSettings (): Settings {
 
     // @ts-ignore
     if (typeof packageResult === 'undefined') {
-        throw new Error('Missing required "mocked-server" settings in the package.json. See documentation for example.');
+        throw new Error('Missing required "mocked-server" settings in the package.json. See documentation for example. https://www.npmjs.com/package/mocked-server');
     }
 
-    if (!['mocha', 'jest', 'none'].includes(packageResult.testRunner)) {
-        throw new Error('Missing or invalid option for key "testRunner" in the package.json.');
+    const validTestRunners = ['mocha', 'jest', 'none'];
+    if (!validTestRunners.includes(packageResult.testRunner)) {
+        throw new Error(`Missing or invalid option for key "testRunner" in the package.json. Valid options are: ${validTestRunners.join(', ')}.`);
     }
 
     return packageResult;

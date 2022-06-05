@@ -6,6 +6,23 @@ Mock server built with real testing needs in mind.
 The ``mocha`` or ``jest`` test runner is needed to be used as the MockedServer automatically binds "checkers" to test all assertions were fulfilled during all tests.
 The MockedServer uses Koa inside for routing and request handling, so you write Koa-like request handlers.
 
+## Installation & Configuration
+
+1. run: 
+```shell
+npm i mocked-server -D
+```
+
+2. place configuration inside your package.json
+```json
+{
+    "mocked-server": {
+        "testRunner": "mocha"
+    }
+}
+```
+Valid options for the `testRunner`: `mocha` / `jest` / `none`.
+
 ## Example
 
 ```javascript
@@ -21,7 +38,7 @@ class SomeService extends MockedServer {
         
         // define an endpoint and store it as a member property
         // all POST request to /somePath will be handled by the default handler
-        // unless you specify 
+        // unless you specify an one-time handler (shown by fillowing examples)
         this.endpoint = this.post('/somePath/:id', (ctx) => {
             ctx.body = { message: 'default response' };
             ctx.status = 200;
