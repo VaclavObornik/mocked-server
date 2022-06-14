@@ -11,7 +11,11 @@ import * as http from "http";
 
 export class MockServer {
 
-    public readyPromise: Promise<void>;
+    public _readyPromise: Promise<void> | undefined;
+
+    public get readyPromise (): Promise<void> | undefined {
+        return this._readyPromise;
+    }
 
     private readonly server: Server;
 
@@ -85,14 +89,14 @@ export class MockServer {
     }
 
     private start () {
-        this.readyPromise = new Promise<void>((resolve, reject) => {
+        this._readyPromise = new Promise<void>((resolve, reject) => {
             this.server.on('error', reject); // typically EADDRINUSE
             this.server.listen(this._port, () => {
                 this.server.removeListener('error', reject);
                 resolve();
             });
         });
-        return this.readyPromise;
+        return this._readyPromise;
     }
 
     private _bindMocha () {
