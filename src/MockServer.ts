@@ -11,9 +11,9 @@ import * as http from "http";
 
 export class MockServer {
 
-    public readonly readyPromise: Promise<void>;
+    public readyPromise: Promise<void>;
 
-    private server: Server;
+    private readonly server: Server;
 
     private readonly _port: number;
 
@@ -69,15 +69,7 @@ export class MockServer {
             ctx.body = { error: error.toString() };
         });
 
-        this.server = http.createServer(this._app.callback())
-
-        this.readyPromise = new Promise<void>((resolve, reject) => {
-            this.server.on('error', reject); // typically EADDRINUSE
-            this.server.listen(this._port, () => {
-                this.server.removeListener('error', reject);
-                resolve();
-            });
-        });
+        this.server = http.createServer(this._app.callback());
 
         const settings = getSettings();
 
@@ -86,14 +78,28 @@ export class MockServer {
 
         } else if (settings.testRunner === 'jest') {
             this._bindJest();
+
+        } else {
+            this.start();
         }
+    }
+
+    private start () {
+        this.readyPromise = new Promise<void>((resolve, reject) => {
+            this.server.on('error', reject); // typically EADDRINUSE
+            this.server.listen(this._port, () => {
+                this.server.removeListener('error', reject);
+                resolve();
+            });
+        });
+        return this.readyPromise;
     }
 
     private _bindMocha () {
 
         const mocha = require('mocha');
 
-        mocha.before(() => this.readyPromise);
+        mocha.before(() => this.start());
 
         mocha.after(() => this.server.close());
 
@@ -114,14 +120,14 @@ export class MockServer {
 
         const jest = require('@jest/globals');
 
-        global.beforeAll(() => this.readyPromise);
+        jest.beforeAll(() => this.start());
 
-        global.afterAll(() => this.server.close());
+        jest.afterAll(() => this.server.close());
 
-        global.beforeEach(() => this.reset());
+        jest.beforeEach(() => this.reset());
 
         const runAllCheckers = this.runAllCheckers.bind(this);
-        global.afterEach(function () {
+        jest.afterEach(function () {
             runAllCheckers();
         });
     }
