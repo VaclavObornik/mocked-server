@@ -239,7 +239,6 @@ export class MockServer {
      */
     private _handle (method: Method, path: Path, handler: Middleware): void {
         this._commonHandlersRouter[this._lowercaseMethod(method)](path, handler);
-        this._commonHandlersRouter['put'](path, handler);
     }
 
     /**

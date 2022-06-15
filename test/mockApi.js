@@ -13,6 +13,11 @@ class MockApi extends MockedServer {
             ctx.body = { endpoint: 1 };
         });
 
+        this.putEndpointGeneralPath = this.put('/general-endpoint/:resourceId?', (ctx) => {
+            ctx.state.paramsInDefaultHandler = ctx.params;
+            ctx.body = { calledMethod: 'put' };
+        });
+
     }
 
 }

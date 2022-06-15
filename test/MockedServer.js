@@ -175,25 +175,15 @@ describe('handleNext', () => {
             }));
     });
 
-    describe('notReceive', () => {
-
-        it('should fail when any request came to the endpoint', async () => {
-
-            await assert.rejects(
-                async () => {
-                    await request.get('/general-endpoint')
-                        .expect(mockApi.generalEndpoint.notReceive());
-                },
-                /Mock api received unexpected GET request to '\/general-endpoint\/:resourceId\?' path/,
-                'Expect function should fail when API receives not expected request'
-            );
-        });
-
-        it('should be ok when no request came to endpoint', async () => {
-            await request.get('/general-endpoint-wrong-path')
-                .expect(mockApi.generalEndpoint.notReceive());
-        });
-
+    it('should properly propagate request to default handler with right method', async () => {
+        const res = await request.put('/general-endpoint')
+            .set({ 'Content-Type': 'text/xml' })
+            .send('articleText')
+            .expect(mockApi.putEndpointGeneralPath.handleNext(async (ctx, next) => {
+                await next();
+                assert.deepStrictEqual(ctx.body, { calledMethod: 'put' });
+            }));
+        assert.deepStrictEqual(res.body, { calledMethod: 'put' });
     });
 
      describe('matching', () => {
@@ -222,6 +212,28 @@ describe('handleNext', () => {
                 .expect(202, 'onetimeHandler2');
 
         });
+    });
+
+});
+
+
+describe('notReceive', () => {
+
+    it('should fail when any request came to the endpoint', async () => {
+
+        await assert.rejects(
+            async () => {
+                await request.get('/general-endpoint')
+                    .expect(mockApi.generalEndpoint.notReceive());
+            },
+            /Mock api received unexpected GET request to '\/general-endpoint\/:resourceId\?' path/,
+            'Expect function should fail when API receives not expected request'
+        );
+    });
+
+    it('should be ok when no request came to endpoint', async () => {
+        await request.get('/general-endpoint-wrong-path')
+            .expect(mockApi.generalEndpoint.notReceive());
     });
 
 });
