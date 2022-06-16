@@ -2,6 +2,8 @@ import { Context } from "koa";
 
 export type Matcher = (ctx: Context) => boolean | Promise<boolean>;
 
+export type TemplateMatcher = Record<string|number, any|RegExp|((val: any) => boolean)>;
+
 export type LowercasedMethod = 'get' | 'post' | 'put' | 'link' | 'unlink' | 'delete' | 'del' | 'head' | 'options' | 'patch' | 'all';
 
 export type Method = LowercasedMethod | 'GET' | 'POST' | 'PUT' | 'LINK' | 'UNLINK' | 'DELETE' | 'DEL' | 'HEAD' | 'OPTIONS' | 'PATCH' | 'ALL';

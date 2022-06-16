@@ -1,11 +1,10 @@
-import {AwaitableChecker, Checker, Matcher, Method, Path} from './types';
+import { AwaitableChecker, Checker, Matcher, Method, Path, TemplateMatcher } from './types';
 
 import { mapKeys, isMatchWith, isFunction, isRegExp } from 'lodash';
 
 import { MockServer } from "./MockServer";
 import { Context, Middleware } from 'koa';
 
-export type TemplateMatcher = Record<string|number, any|RegExp|((val: any) => boolean)>;
 
 function testMatch (tested: Record<any, any>, template: TemplateMatcher, expectStrings: boolean): boolean {
     return isMatchWith(tested, template, (currentValue: any, expectedValue: any) => {
