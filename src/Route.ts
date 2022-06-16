@@ -1,12 +1,28 @@
 import {AwaitableChecker, Checker, Matcher, Method, Path} from './types';
 
-import isMatch from 'lodash.ismatch';
-import mapValues from 'lodash.mapvalues';
-import every from 'lodash.every';
+import { mapKeys, isMatchWith, isFunction, isRegExp } from 'lodash';
 
 import { MockServer } from "./MockServer";
 import { Context, Middleware } from 'koa';
 
+export type TemplateMatcher = Record<string|number, any|RegExp|((val: any) => boolean)>;
+
+function testMatch (tested: Record<any, any>, template: TemplateMatcher, expectStrings: boolean): boolean {
+    return isMatchWith(tested, template, (currentValue: any, expectedValue: any) => {
+        if (isRegExp(expectedValue)) {
+            return expectedValue.test(currentValue);
+        }
+        if (isFunction(expectedValue)) {
+            return expectedValue(currentValue);
+        }
+
+        if (expectStrings) {
+            return currentValue === `${expectedValue}`;
+        }
+
+        return undefined; // default isMatch behavior
+    });
+}
 
 export class Route {
 
@@ -16,6 +32,8 @@ export class Route {
         private _path: Path,
         private _matchers: Matcher[] = []
     ) {}
+
+
 
     /**
      * Returns a customized Route instance, which will match only requests for which the Matcher function returns true
@@ -30,36 +48,30 @@ export class Route {
     /**
      * Returns a customized Route instance, which will match only requests with the path params specified
      */
-    matchingParams (matcher: Record<string, any>): Route {
-        const _matcher = this.stringifyValues(matcher);
-        return this.matching((ctx) => isMatch(ctx.params, _matcher));
+    matchingParams (matcher: TemplateMatcher): Route {
+        return this.matching((ctx) => testMatch(ctx.params, matcher, true));
     }
 
     /**
      * Returns a customized Route instance, which will match only requests with the query params specified
      */
-    matchingQuery (matcher: Record<string, any>): Route {
-        const _matcher = this.stringifyValues(matcher);
-        return this.matching((ctx) => isMatch(ctx.query, _matcher));
+    matchingQuery (matcher: TemplateMatcher): Route {
+        return this.matching((ctx) => testMatch(ctx.query, matcher, true));
     }
 
     /**
      * Returns a customized Route instance, which will match only requests with the matching headers
      */
-    matchingHeaders (matcher: Record<string, any>): Route {
-        const _matcher = this.stringifyValues(matcher);
-        return this.matching((ctx) => every(_matcher, (value, header) => ctx.get(header) === value));
+    matchingHeaders (matcher: TemplateMatcher): Route {
+        matcher = mapKeys(matcher, (value: any, key: any) => `${key}`.toLowerCase());
+        return this.matching((ctx) => testMatch(ctx.headers, matcher, true));
     }
 
     /**
      * Returns a customized Route instance, which will match only requests with the matching body
      */
-    matchingBody (matcher: any): Route {
-        return this.matching((ctx) => isMatch(ctx.request.body, matcher));
-    }
-
-    private stringifyValues (matcher: Record<string, any>): Record<string, string> {
-        return mapValues(matcher, (value) => `${value}`);
+    matchingBody (matcher: TemplateMatcher): Route {
+        return this.matching((ctx) => testMatch(ctx.request.body, matcher, false));
     }
 
     private _getSingleMatcher (): Matcher {
