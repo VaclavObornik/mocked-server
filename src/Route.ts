@@ -1,5 +1,9 @@
 import {AwaitableChecker, Checker, Matcher, Method, Path} from './types';
 
+import isMatch from 'lodash.ismatch';
+import mapValues from 'lodash.mapvalues';
+import every from 'lodash.every';
+
 import { MockServer } from "./MockServer";
 import { Context, Middleware } from 'koa';
 
@@ -13,11 +17,49 @@ export class Route {
         private _matchers: Matcher[] = []
     ) {}
 
-    matching (matcher: Matcher) {
+    /**
+     * Returns a customized Route instance, which will match only requests for which the Matcher function returns true
+     */
+    matching (matcher: Matcher): Route {
         return new Route(this._mockServer, this._method, this._path, [
             ...this._matchers,
             matcher
         ]);
+    }
+
+    /**
+     * Returns a customized Route instance, which will match only requests with the path params specified
+     */
+    matchingParams (matcher: Record<string, any>): Route {
+        const _matcher = this.stringifyValues(matcher);
+        return this.matching((ctx) => isMatch(ctx.params, _matcher));
+    }
+
+    /**
+     * Returns a customized Route instance, which will match only requests with the query params specified
+     */
+    matchingQuery (matcher: Record<string, any>): Route {
+        const _matcher = this.stringifyValues(matcher);
+        return this.matching((ctx) => isMatch(ctx.query, _matcher));
+    }
+
+    /**
+     * Returns a customized Route instance, which will match only requests with the matching headers
+     */
+    matchingHeaders (matcher: Record<string, any>): Route {
+        const _matcher = this.stringifyValues(matcher);
+        return this.matching((ctx) => every(_matcher, (value, header) => ctx.get(header) === value));
+    }
+
+    /**
+     * Returns a customized Route instance, which will match only requests with the matching body
+     */
+    matchingBody (matcher: any): Route {
+        return this.matching((ctx) => isMatch(ctx.request.body, matcher));
+    }
+
+    private stringifyValues (matcher: Record<string, any>): Record<string, string> {
+        return mapValues(matcher, (value) => `${value}`);
     }
 
     private _getSingleMatcher (): Matcher {

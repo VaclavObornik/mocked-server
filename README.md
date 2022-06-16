@@ -185,6 +185,26 @@ describe('testedProcedure', () => {
         await testedProcedure(3); // this call will receive the 'default response' message
     });
 
+    /**
+     * We can use 'matchingParams', 'matchingQuery', 'matchingHeaders', 'matchingBody' to test specific endpoint calls
+     * - to decide whether params/query/body does match or not, lodash's isMatch function is used, see https://lodash.com/docs/#isMatch
+     * - headers comparsion is case-insensitive, because the HTTP standard says to
+     * - values provided to matching params/query/headers are stringified before comparsion 
+     */
+    it('should call our endpoint - with custom handler', async () => {
+        myServer.endpoint
+            .matchingParams({ myPathParam: 'someValue' })
+            .matchingQuery({ myQueryParam: 1 })
+            .matchingHeaders({ Authorization: 'token-1' })
+            .matchingBody({ bodyProperty: 'expectedValue' })
+            .handleNext((ctx) => {
+                ctx.body = { message: 'received expected request!' };
+                ctx.status = 201;
+            });
+
+        await testedProcedure();
+    });
+
 });
 ```
 
