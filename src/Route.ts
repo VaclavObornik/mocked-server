@@ -1,4 +1,14 @@
-import { AwaitableChecker, Checker, Matcher, Method, Path, TemplateMatcher } from './types';
+import {
+    AwaitableChecker,
+    Checker,
+    Matcher,
+    MatcherFunction,
+    MatcherProp,
+    Method,
+    Path,
+    TemplateMatcher,
+    ValueToMatch,
+} from './types';
 
 import { mapKeys, isMatchWith, isFunction, isRegExp } from 'lodash';
 
@@ -29,7 +39,7 @@ export class Route {
         private _mockServer: MockServer,
         private _method: Method,
         private _path: Path,
-        private _matchers: Matcher[] = []
+        private _matchers: MatcherFunction[] = []
     ) {}
 
 
@@ -38,10 +48,37 @@ export class Route {
      * Returns a customized Route instance, which will match only requests for which the Matcher function returns true
      */
     matching (matcher: Matcher): Route {
-        return new Route(this._mockServer, this._method, this._path, [
-            ...this._matchers,
-            matcher
-        ]);
+
+        if (isFunction(matcher)) {
+            return new Route(this._mockServer, this._method, this._path, [
+                ...this._matchers,
+                matcher
+            ]);
+        }
+
+        const validProps: MatcherProp[] = ['params', 'query', 'body', 'headers'];
+        const usedProps = Object.keys(matcher);
+
+        const invalidProps = usedProps.filter((prop) => !validProps.includes(prop as MatcherProp));
+        if (invalidProps.length) {
+            throw new Error(`Unknown matcher prop(s) "${invalidProps.join(', ')}". Only "${validProps.join(', ')}" are supported.`);
+        }
+
+        return (usedProps as MatcherProp[]).reduce((prev: Route, prop: MatcherProp): Route => {
+            if (prop === 'headers') {
+                return prev.matchingHeaders(matcher[prop]);
+            }
+            if (prop === 'params') {
+                return prev.matchingParams(matcher[prop]);
+            }
+            if (prop === 'query') {
+                return prev.matchingQuery(matcher[prop]);
+            }
+            if (prop === 'body') {
+                return prev.matchingBody(matcher[prop]);
+            }
+            throw new Error('This cannot happen.');
+        }, this);
     }
 
     /**
@@ -52,10 +89,24 @@ export class Route {
     }
 
     /**
+     * Returns a customized Route instance, which will match only requests with the path param specified
+     */
+    matchingParam (param: string, value: ValueToMatch): Route {
+        return this.matchingParams({ [param]: value });
+    }
+
+    /**
      * Returns a customized Route instance, which will match only requests with the query params specified
      */
     matchingQuery (matcher: TemplateMatcher): Route {
         return this.matching((ctx) => testMatch(ctx.query, matcher, true));
+    }
+
+    /**
+     * Returns a customized Route instance, which will match only requests with the query params specified
+     */
+    matchingQueryParam (param: string, value: ValueToMatch): Route {
+        return this.matchingQuery({ [param]: value });
     }
 
     /**
@@ -67,13 +118,20 @@ export class Route {
     }
 
     /**
+     * Returns a customized Route instance, which will match only requests with the matching headers
+     */
+    matchingHeader (header: string, value: ValueToMatch): Route {
+        return this.matchingHeaders({ [header]: value });
+    }
+
+    /**
      * Returns a customized Route instance, which will match only requests with the matching body
      */
     matchingBody (matcher: TemplateMatcher): Route {
         return this.matching((ctx) => testMatch(ctx.request.body, matcher, false));
     }
 
-    private _getSingleMatcher (): Matcher {
+    private _getSingleMatcher (): MatcherFunction {
         return async (ctx: Context) => {
             for (const matcher of this._matchers) {
                 if (!(await matcher(ctx))) {

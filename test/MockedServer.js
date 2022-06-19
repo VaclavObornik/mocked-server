@@ -213,86 +213,113 @@ describe('handleNext', () => {
 
         });
 
+        it('should not be possible to use wrong matcher param', async () => {
+            assert.throws(() => mockApi.generalEndpoint.matching({ x: { a: 1 } }), /Error: Unknown matcher prop\(s\) "x". Only "params, query, body, headers" are supported./);
+        });
+
         it('should be possible to use matchingParams', async () => {
 
-            mockApi.generalEndpoint
-                .matchingParams({ resourceId: 99 })
-                .handleNext((ctx) => {
+            const variants = [
+                () => mockApi.generalEndpoint.matchingParams({ resourceId: 99 }),
+                () => mockApi.generalEndpoint.matchingParam('resourceId', 99),
+                () => mockApi.generalEndpoint.matching({ params: { resourceId: 99 } }),
+            ];
+
+            for (const variant of variants) {
+                variant().handleNext((ctx) => {
                     ctx.status = 202;
                     ctx.body = 'onetimeHandler2';
                 });
 
-            mockApi.generalEndpoint.handleNext((ctx) => {
-                ctx.status = 201;
-                ctx.body = 'onetimeHandler1';
-            });
+                mockApi.generalEndpoint.handleNext((ctx) => {
+                    ctx.status = 201;
+                    ctx.body = 'onetimeHandler1';
+                });
 
-            await request.get('/general-endpoint')
-                .expect(201, 'onetimeHandler1');
+                await request.get('/general-endpoint')
+                    .expect(201, 'onetimeHandler1');
 
-            await request.get('/general-endpoint')
-                .expect(200, { endpoint: 1 });
+                await request.get('/general-endpoint')
+                    .expect(200, { endpoint: 1 });
 
-            await request.get('/general-endpoint/99')
-                .expect(202, 'onetimeHandler2');
+                await request.get('/general-endpoint/99')
+                    .expect(202, 'onetimeHandler2');
 
+                mockApi.runAllCheckers();
+            }
         });
 
         it('should be possible to use matchingQuery', async () => {
 
-            mockApi.generalEndpoint
-                .matchingQuery({ resourceId: 99 })
-                .handleNext((ctx) => {
+            const variants = [
+                () => mockApi.generalEndpoint.matchingQuery({ resourceId: 99 }),
+                () => mockApi.generalEndpoint.matchingQueryParam('resourceId', 99),
+                () => mockApi.generalEndpoint.matching({ query: { resourceId: 99 } }),
+            ];
+
+            for (const variant of variants) {
+                variant().handleNext((ctx) => {
                     ctx.status = 202;
                     ctx.body = 'onetimeHandler2';
                 });
 
-            mockApi.generalEndpoint.handleNext((ctx) => {
-                ctx.status = 201;
-                ctx.body = 'onetimeHandler1';
-            });
+                mockApi.generalEndpoint.handleNext((ctx) => {
+                    ctx.status = 201;
+                    ctx.body = 'onetimeHandler1';
+                });
 
-            await request.get('/general-endpoint')
-                .expect(201, 'onetimeHandler1');
+                await request.get('/general-endpoint')
+                    .expect(201, 'onetimeHandler1');
 
-            await request.get('/general-endpoint')
-                .expect(200, { endpoint: 1 });
+                await request.get('/general-endpoint')
+                    .expect(200, { endpoint: 1 });
 
-            await request.get('/general-endpoint?resourceId=100')
-                .expect(200, { endpoint: 1 });
+                await request.get('/general-endpoint?resourceId=100')
+                    .expect(200, { endpoint: 1 });
 
-            await request.get('/general-endpoint?resourceId=99')
-                .expect(202, 'onetimeHandler2');
+                await request.get('/general-endpoint?resourceId=99')
+                    .expect(202, 'onetimeHandler2');
 
+                mockApi.runAllCheckers();
+            }
         });
 
         it('should be possible to use matchingHeaders', async () => {
 
-            mockApi.generalEndpoint
-                .matchingHeaders({ resourceId: 99 })
-                .handleNext((ctx) => {
+            const variants = [
+                () => mockApi.generalEndpoint.matchingHeaders({ resourceId: 99 }),
+                () => mockApi.generalEndpoint.matchingHeader('resourceId', 99),
+                () => mockApi.generalEndpoint.matching({ headers: { resourceId: 99 } }),
+            ];
+
+            for (const variant of variants) {
+
+                variant().handleNext((ctx) => {
                     ctx.status = 202;
                     ctx.body = 'onetimeHandler2';
                 });
 
-            mockApi.generalEndpoint.handleNext((ctx) => {
-                ctx.status = 201;
-                ctx.body = 'onetimeHandler1';
-            });
+                mockApi.generalEndpoint.handleNext((ctx) => {
+                    ctx.status = 201;
+                    ctx.body = 'onetimeHandler1';
+                });
 
-            await request.get('/general-endpoint')
-                .expect(201, 'onetimeHandler1');
+                await request.get('/general-endpoint')
+                    .expect(201, 'onetimeHandler1');
 
-            await request.get('/general-endpoint')
-                .expect(200, { endpoint: 1 });
+                await request.get('/general-endpoint')
+                    .expect(200, { endpoint: 1 });
 
-            await request.get('/general-endpoint')
-                .set({ ResourceID: 100 }) // wrong value
-                .expect(200, { endpoint: 1 });
+                await request.get('/general-endpoint')
+                    .set({ ResourceID: 100 }) // wrong value
+                    .expect(200, { endpoint: 1 });
 
-            await request.get('/general-endpoint')
-                .set({ ResourceID: 99 }) // should be case insensitive
-                .expect(202, 'onetimeHandler2');
+                await request.get('/general-endpoint')
+                    .set({ ResourceID: 99 }) // should be case insensitive
+                    .expect(202, 'onetimeHandler2');
+
+                mockApi.runAllCheckers();
+            }
 
         });
 

@@ -5,7 +5,7 @@ import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
 import { Route } from './Route';
 import { getSettings } from './getSettings';
-import { AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, Matcher, Method, Path } from './types';
+import { AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, MatcherFunction, Method, Path } from './types';
 import { Server } from "http";
 import * as http from "http";
 
@@ -146,9 +146,9 @@ export class MockServer {
      * @returns {AwaitableChecker} Returns function that checks the route was requested and the handler responded without error.
      * @internal
      */
-    _handleNext<T> (method: Method, path: Path, matcher: Matcher, handler: Middleware<T>|undefined, promiseLike: true): AwaitableChecker;
-    _handleNext<T> (method: Method, path: Path, matcher: Matcher, handler: Middleware<T>|undefined, promiseLike: false): Checker;
-    _handleNext<T> (method: Method, path: Path, matcher: Matcher, handler: Middleware<T> = (ctx, next) => next(), promiseLike: boolean): AwaitableChecker | Checker {
+    _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T>|undefined, promiseLike: true): AwaitableChecker;
+    _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T>|undefined, promiseLike: false): Checker;
+    _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T> = (ctx, next) => next(), promiseLike: boolean): AwaitableChecker | Checker {
 
         let requestReceived = false;
         let error: Error;
@@ -210,7 +210,7 @@ export class MockServer {
     }
 
     /** @internal */
-    _notReceive (method: Method, path: Path, matcher: Matcher): Checker {
+    _notReceive (method: Method, path: Path, matcher: MatcherFunction): Checker {
         let error: Error;
 
         const cancel = this._addOnetimeHandler(method, path, matcher,async (ctx, next) => {
@@ -321,7 +321,7 @@ export class MockServer {
         return method.toLowerCase() as LowercasedMethod;
     }
 
-    private _addOnetimeHandler (method: Method, path: Path, matcher: Matcher, handler: Middleware) {
+    private _addOnetimeHandler (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware) {
 
         let pending = true;
         const disableHandler = () => (pending = false);

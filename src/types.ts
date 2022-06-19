@@ -1,8 +1,14 @@
 import { Context } from "koa";
 
-export type Matcher = (ctx: Context) => boolean | Promise<boolean>;
+export type MatcherFunction = (ctx: Context) => boolean | Promise<boolean>;
 
-export type TemplateMatcher = Record<string|number, any|RegExp|((val: any) => boolean)>;
+export type ValueToMatch = any | RegExp | ((val: any) => boolean);
+
+export type TemplateMatcher = Record<string|number, ValueToMatch>;
+
+export type MatcherProp = 'params' | 'query' | 'body' | 'headers';
+
+export type Matcher = MatcherFunction | Record<MatcherProp, TemplateMatcher>;
 
 export type LowercasedMethod = 'get' | 'post' | 'put' | 'link' | 'unlink' | 'delete' | 'del' | 'head' | 'options' | 'patch' | 'all';
 
