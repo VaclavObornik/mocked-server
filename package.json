@@ -37,6 +37,7 @@
     "@types/koa": "^2.13.4",
     "@types/koa-bodyparser": "^4.3.7",
     "@types/koa-router": "^7.4.4",
+    "debug": "^4.3.4",
     "koa": "^2.13.4",
     "koa-bodyparser": "^4.3.0",
     "koa-router": "^10.1.1",
@@ -45,6 +46,7 @@
   },
   "devDependencies": {
     "@tsconfig/node14": "^1.0.3",
+    "@types/debug": "^4.1.7",
     "@types/jest": "^28.1.1",
     "@types/lodash": "^4.14.182",
     "@types/mocha": "^9.1.1",

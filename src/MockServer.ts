@@ -8,6 +8,7 @@ import { getSettings } from './getSettings';
 import { AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, MatcherFunction, Method, Path } from './types';
 import { Server } from "http";
 import * as http from "http";
+import { debug } from './debug';
 
 export class MockServer {
 
@@ -35,6 +36,8 @@ export class MockServer {
      * @param {string|number} urlOrPort
      */
     constructor (urlOrPort: string|number) {
+
+        debug(`new MockedServer() called with urlOrPort: ${urlOrPort}`);
 
         if (typeof urlOrPort === 'number') {
             this._port = urlOrPort;
@@ -89,24 +92,65 @@ export class MockServer {
     }
 
     private start () {
+        debug(`start() called, staring server on ${this._port}`);
         this._readyPromise = new Promise<void>((resolve, reject) => {
-            this.server.on('error', reject); // typically EADDRINUSE
+            const onErrorCallback = (err: Error) => {
+                debug(`sever listen() error for port ${this._port}`);
+                reject(err);
+            };
+            this.server.on('error', onErrorCallback); // typically EADDRINUSE
             this.server.listen(this._port, () => {
-                this.server.removeListener('error', reject);
+                debug(`server listening on port ${this._port}`);
+                this.server.removeListener('error', onErrorCallback);
                 resolve();
             });
         });
         return this._readyPromise;
     }
 
+    private close () {
+        debug(`jest.afterAll called; closing port ${this._port}`);
+        return new Promise<void>((resolve, reject) => {
+            this.server.close((err) => {
+                if (err) {
+                    debug(`jest.afterAll closing error for port ${this._port}; error: ${err}`);
+                    reject(err);
+                } else {
+                    debug(`server closed for port ${this._port}`);
+                    resolve();
+                }
+            });
+        });
+    }
+
     private _bindMocha () {
+
+        debug('Binding Mocha');
 
         const mocha = require('mocha');
 
-        mocha.before(() => this.start());
+        mocha.before(async () => {
+            debug(`jest.beforeAll called; port ${this._port}`);
+            try {
+                await this.start();
+                debug(`jest.beforeAll success for port ${this._port}`);
 
-        mocha.after((done: any) => {
-            this.server.close(done);
+            } catch (err) {
+                debug(`jest.beforeAll error for port ${this._port}; error: ${err}`);
+                throw err;
+            }
+        });
+
+        mocha.after(async () => {
+            debug(`mocha.afterAll called; port ${this._port}`);
+            try {
+                await this.close();
+                debug(`mocha.afterAll success for port ${this._port}`);
+
+            } catch (err) {
+                debug(`mocha.afterAll error for port ${this._port}; error: ${err}`);
+                throw err;
+            }
         });
 
         mocha.beforeEach(() => this.reset());
@@ -124,12 +168,32 @@ export class MockServer {
 
     private _bindJest () {
 
+        debug('Binding Jest');
+
         const jest = require('@jest/globals');
 
-        jest.beforeAll(() => this.start());
+        jest.beforeAll(async () => {
+            debug(`jest.beforeAll called; port ${this._port}`);
+            try {
+                await this.start();
+                debug(`jest.beforeAll success for port ${this._port}`);
 
-        jest.afterAll((done: any) => {
-            this.server.close(done);
+            } catch (err) {
+                debug(`jest.beforeAll error for port ${this._port}; error: ${err}`);
+                throw err;
+            }
+        });
+
+        jest.afterAll(async () => {
+            debug(`jest.afterAll called; port ${this._port}`);
+            try {
+                await this.close();
+                debug(`jest.afterAll success for port ${this._port}`);
+
+            } catch (err) {
+                debug(`jest.afterAll error for port ${this._port}; error: ${err}`);
+                throw err;
+            }
         });
 
         jest.beforeEach(() => this.reset());
