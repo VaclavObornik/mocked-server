@@ -109,11 +109,11 @@ export class MockServer {
     }
 
     private close () {
-        debug(`jest.afterAll called; closing port ${this._port}`);
+        debug(`server.close called; closing port ${this._port}`);
         return new Promise<void>((resolve, reject) => {
             this.server.close((err) => {
                 if (err) {
-                    debug(`jest.afterAll closing error for port ${this._port}; error: ${err}`);
+                    debug(`server closing error for port ${this._port}; error: ${err}`);
                     reject(err);
                 } else {
                     debug(`server closed for port ${this._port}`);
@@ -168,30 +168,31 @@ export class MockServer {
 
     private _bindJest () {
 
-        debug('Binding Jest');
+        const workerId = process.env.JEST_WORKER_ID ?? 'undefined';
+        debug(`Binding Jest; workerId: ${workerId}`);
 
         const jest = require('@jest/globals');
 
         jest.beforeAll(async () => {
-            debug(`jest.beforeAll called; port ${this._port}`);
+            debug(`jest.beforeAll called; port ${this._port}; workerId: ${workerId}`);
             try {
                 await this.start();
-                debug(`jest.beforeAll success for port ${this._port}`);
+                debug(`jest.beforeAll success for port ${this._port}; workerId: ${workerId}`);
 
             } catch (err) {
-                debug(`jest.beforeAll error for port ${this._port}; error: ${err}`);
+                debug(`jest.beforeAll error for port ${this._port}; workerId: ${workerId}; error: ${err}`);
                 throw err;
             }
         });
 
         jest.afterAll(async () => {
-            debug(`jest.afterAll called; port ${this._port}`);
+            debug(`jest.afterAll called; port ${this._port}; workerId: ${workerId}`);
             try {
                 await this.close();
-                debug(`jest.afterAll success for port ${this._port}`);
+                debug(`jest.afterAll success for port ${this._port}; workerId: ${workerId}`);
 
             } catch (err) {
-                debug(`jest.afterAll error for port ${this._port}; error: ${err}`);
+                debug(`jest.afterAll error for port ${this._port}; error: ${err}; workerId: ${workerId}`);
                 throw err;
             }
         });
