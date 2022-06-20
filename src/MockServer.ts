@@ -105,7 +105,9 @@ export class MockServer {
 
         mocha.before(() => this.start());
 
-        mocha.after(() => this.server.close());
+        mocha.after((done: any) => {
+            this.server.close(done);
+        });
 
         mocha.beforeEach(() => this.reset());
 
@@ -126,7 +128,9 @@ export class MockServer {
 
         jest.beforeAll(() => this.start());
 
-        jest.afterAll(() => this.server.close());
+        jest.afterAll((done: any) => {
+            this.server.close(done);
+        });
 
         jest.beforeEach(() => this.reset());
 
