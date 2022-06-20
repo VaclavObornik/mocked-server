@@ -41,7 +41,10 @@
     "koa": "^2.13.4",
     "koa-bodyparser": "^4.3.0",
     "koa-router": "^10.1.1",
-    "lodash": "^4.17.21",
+    "lodash.isfunction": "^3.0.9",
+    "lodash.ismatchwith": "^4.4.0",
+    "lodash.isregexp": "^4.0.1",
+    "lodash.mapkeys": "^4.6.0",
     "pkg-up": "^3.1.0"
   },
   "devDependencies": {
@@ -49,6 +52,10 @@
     "@types/debug": "^4.1.7",
     "@types/jest": "^28.1.1",
     "@types/lodash": "^4.14.182",
+    "@types/lodash.isfunction": "^3.0.7",
+    "@types/lodash.ismatchwith": "^4.4.7",
+    "@types/lodash.isregexp": "^4.0.7",
+    "@types/lodash.mapkeys": "^4.6.7",
     "@types/mocha": "^9.1.1",
     "@types/node": "^18.0.0",
     "mocha": "^10.0.0",

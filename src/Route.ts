@@ -10,7 +10,10 @@ import {
     ValueToMatch,
 } from './types';
 
-import { mapKeys, isMatchWith, isFunction, isRegExp } from 'lodash';
+import mapKeys from 'lodash.mapkeys';
+import isMatchWith from 'lodash.ismatchwith';
+import isFunction from 'lodash.isfunction';
+import isRegExp from 'lodash.isregexp';
 
 import { MockServer } from "./MockServer";
 import { Context, Middleware } from 'koa';
