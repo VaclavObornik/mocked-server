@@ -42,7 +42,22 @@ export class Route {
         private _matchers: MatcherFunction[] = []
     ) {}
 
+    extend <X>(extend: (route: Route) => X): Route & X {
+        const updatedRoute = new Route(this._mockServer, this._method, this._path, this._matchers);
+        return Object.assign(updatedRoute, extend(updatedRoute));
+    }
 
+    a () {
+        const extended = this.extend((route) => ({
+            matchGlobalDataId (id: any) {
+                // return this.matchingParam('globalDataId', id); //
+                return route.matchingParam('globalDataId', id); // nad timhle uz nemohu zavolat matchGlobalDataId()
+            }
+        }));
+
+        extended.matchGlobalDataId(1).
+
+    }
 
     /**
      * Returns a customized Route instance, which will match only requests for which the Matcher function returns true
