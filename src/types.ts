@@ -8,7 +8,14 @@ export type TemplateMatcher = Record<string|number, ValueToMatch>;
 
 export type MatcherProp = 'params' | 'query' | 'body' | 'headers';
 
-export type Matcher = MatcherFunction | Record<MatcherProp, TemplateMatcher>;
+export type Matcher = MatcherFunction | Partial<Record<MatcherProp, TemplateMatcher>>;
+
+export type TestRunner = 'mocha' | 'jest' | 'none';
+
+export interface MockServerOptions {
+    /** Overrides the "mocked-server" configuration from package.json. */
+    testRunner?: TestRunner;
+}
 
 export type LowercasedMethod = 'get' | 'post' | 'put' | 'link' | 'unlink' | 'delete' | 'del' | 'head' | 'options' | 'patch' | 'all';
 

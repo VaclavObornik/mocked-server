@@ -65,17 +65,18 @@ export class Route {
         }
 
         return (usedProps as MatcherProp[]).reduce((prev: Route, prop: MatcherProp): Route => {
+            // props come from Object.keys(matcher), so the values cannot be undefined
             if (prop === 'headers') {
-                return prev.matchingHeaders(matcher[prop]);
+                return prev.matchingHeaders(matcher[prop]!);
             }
             if (prop === 'params') {
-                return prev.matchingParams(matcher[prop]);
+                return prev.matchingParams(matcher[prop]!);
             }
             if (prop === 'query') {
-                return prev.matchingQuery(matcher[prop]);
+                return prev.matchingQuery(matcher[prop]!);
             }
             if (prop === 'body') {
-                return prev.matchingBody(matcher[prop]);
+                return prev.matchingBody(matcher[prop]!);
             }
             throw new Error('This cannot happen.');
         }, this);

@@ -1,19 +1,20 @@
 
-# mocker-server
+# mocked-server
 
 Mock server built with real testing needs in mind.
 
-The ``mocha`` or ``jest`` test runner is needed to be used as the MockedServer automatically binds "checkers" to test all assertions were fulfilled during all tests.
-The MockedServer uses Koa inside for routing and request handling, so you write Koa-like request handlers.
+Use it to stand in for a remote HTTP API that your tested code calls. The server binds to your test runner (`mocha` or `jest`) and automatically verifies after each test that all expected calls happened. Routing and request handling use [Koa](https://koajs.com/), so you write Koa-like request handlers.
+
+Requires Node.js 18 or newer.
 
 ## Installation & Configuration
 
-1. run: 
+1. run:
 ```shell
 npm i mocked-server -D
 ```
 
-2. place configuration inside your package.json
+2. tell mocked-server which test runner you use — either in your package.json:
 ```json
 {
     "mocked-server": {
@@ -21,33 +22,39 @@ npm i mocked-server -D
     }
 }
 ```
+or per server instance via a constructor option (overrides the package.json setting):
+```javascript
+new MockServer(3000, { testRunner: 'jest' });
+```
 Valid options for the `testRunner`: `mocha` / `jest` / `none`.
+
+With `mocha` or `jest`, the server automatically starts before your tests, stops after them, resets one-time handlers before each test and verifies all pending checks after each test. With `none`, you control the lifecycle yourself (see [Manual lifecycle](#manual-lifecycle-testrunner-none)).
 
 ## Example
 
 ```javascript
 const { MockServer } = require('mocked-server');
 
-class SomeService extends MockedServer {
-    
+class SomeService extends MockServer {
+
     constructor () {
-        
-        // the MockService will listen on localhost:3000, 
-        // you need to direct your tested code to use this URL instead of real API 
-        this.super(3000);
-        
-        // define an endpoint and store it as a member property
-        // all POST request to /somePath will be handled by the default handler
-        // unless you specify an one-time handler (shown by fillowing examples)
+
+        // the MockServer will listen on localhost:3000;
+        // point your tested code to this URL instead of the real API
+        super(3000);
+
+        // define an endpoint and store it as a member property:
+        // all POST requests to /somePath/:id are handled by the default handler
+        // unless a one-time handler is registered (shown in the following examples)
         this.endpoint = this.post('/somePath/:id', (ctx) => {
             ctx.body = { message: 'default response' };
             ctx.status = 200;
         });
     }
-    
+
 }
 
-const myServer = new MockedService();
+const myServer = new SomeService();
 ```
 Assume we are testing a ```testedProcedure``` function (or an API) which should call SomeService:
 
@@ -55,23 +62,23 @@ Assume we are testing a ```testedProcedure``` function (or an API) which should 
 
 async function testedProcedure (id = 1) {
     // ...some logic calling SomeService via http request to localhost:3000
-    // ... assume it will use the id as endpoint's path parameter
+    // ...assume it will use the id as the endpoint's path parameter
 }
 
 describe('testedProcedure', () => {
 
     /**
-     * This way we test the endpoint was called before the test ends
-     * In case the endpoint wasn't called, the test automatically fail!
+     * This way we test the endpoint was called before the test ends.
+     * In case the endpoint wasn't called, the test automatically fails!
      */
     it('should call our endpoint', async () => {
-        myServer.endpoint.handleNext(); // default handler will be used to respond the endpoint call
+        myServer.endpoint.handleNext(); // the default handler will be used to respond to the endpoint call
         await testedProcedure();
     });
 
     /**
-     * This way we test the endpoint was called before the test ends
-     * The first http call to the endpoint will be processed by the custom handler
+     * This way we test the endpoint was called before the test ends.
+     * The first http call to the endpoint will be processed by the custom handler.
      */
     it('should call our endpoint - with custom handler', async () => {
         myServer.endpoint.handleNext((ctx) => {
@@ -84,10 +91,10 @@ describe('testedProcedure', () => {
 
 
     /**
-     * We can register multiple handlers, each of them will process exactly one next request
-     * If the endpoint is called less-times than expected, the test fails
+     * We can register multiple handlers, each of them will process exactly one next request.
+     * If the endpoint is called fewer times than expected, the test fails.
      */
-    it('should call our endpoint - with custom handler', async () => {
+    it('should call our endpoint multiple times', async () => {
         myServer.endpoint.handleNext((ctx) => {
             ctx.body = { message: 'first response' };
             ctx.status = 201;
@@ -102,11 +109,13 @@ describe('testedProcedure', () => {
     });
 
     /**
-     * We can implement a test-specific logic in the custom handler
+     * We can implement test-specific logic in the custom handler.
+     * When a handler throws (a failed assertion for example), the mock responds
+     * with status 500 and the error, and the error fails the test.
      */
     it('should use an authorization', async () => {
-        myServer.endpoint.handleNext(async (ctx) => {
-            assert(ctx.get('Authorization'), 'Bearer myToken');
+        myServer.endpoint.handleNext(async (ctx, next) => {
+            assert.strictEqual(ctx.get('Authorization'), 'Bearer myToken');
             assert.strictEqual(ctx.params.id, 'expected-id-value');
             await next(); // this will forward the request to the default handler
         });
@@ -114,8 +123,8 @@ describe('testedProcedure', () => {
     });
 
     /**
-     * We can test the testedProcedure will not call our endpoint
-     * If the endpoint is called, the test fails
+     * We can test the testedProcedure will not call our endpoint.
+     * If the endpoint is called, the test fails.
      */
     it('should not call the endpoint', async () => {
         myServer.endpoint.notReceive();
@@ -123,24 +132,24 @@ describe('testedProcedure', () => {
     });
 
     /**
-     * We can check the endpoint was called in a specific time during the test
+     * We can check the endpoint was called at a specific time during the test.
      */
     it('should call the endpoint', async () => {
         const checker = myServer.endpoint.handleNext();
         await testedProcedure();
         checker(); // will throw if the endpoint has not been called yet
-                   // or the endpoint's handler throwed an error (i.e., an assertion error)
+                   // or if the endpoint's handler threw an error (i.e., an assertion error)
         // ...rest of the test
     });
 
     /**
-     * We can use the cecker as "expect" function for supertest
+     * We can use the checker as an "expect" function for supertest.
      */
     it('should call the endpoint via API', async () => {
 
         const request = require('supertest');
         const express = require('express');
-        
+
         const app = express();
         app.post('/endpoint-caller', function(req, res, next) {
             testedProcedure().then(() => {
@@ -151,28 +160,28 @@ describe('testedProcedure', () => {
         await request(app)
             .post('/endpoint-caller')
             .expect(200)
-            .expect(myServer.endpoint.handleNext()) // the result checker can be passed as the
+            .expect(myServer.endpoint.handleNext()) // the returned checker can be passed as the
                                                     // supertest expectation, so it will be called
-                                                    // right after the request finish
-                                                    // and check if the endpoint has been called   
+                                                    // right after the request finishes
+                                                    // and checks that the endpoint has been called
     });
 
     /**
-     * We can await for the API call. This is usefull in case we test an code where 
-     * the endpoint is called on time-basis and we cannot simply say when
+     * We can await the API call. This is useful in case we test code where
+     * the endpoint is called on a time basis and we cannot simply say when.
      */
-    it('should not call the endpoint', async () => {
+    it('should wait for the endpoint call', async () => {
         setTimeout(() => testedProcedure(), 1000);
-        await myServer.endpoint.waitForNext(); // by the 'await', we can wait for the next endpoint call
-                                              // it will throw in case the handler throws an error (i.e., an assertion error)
-                                              // if the endpoint is not called, the test will time out
+        await myServer.endpoint.waitForNext(); // by the 'await', we can wait for the next endpoint call;
+                                               // it will throw in case the handler throws an error (i.e., an assertion error);
+                                               // if the endpoint is not called, the test will time out
         // ...rest of the test
     });
 
     /**
-     * We can use 'matchers' to test specific endpoint calls
+     * We can use 'matchers' to test specific endpoint calls.
      */
-    it('should call our endpoint - with custom handler', async () => {
+    it('should call our endpoint - with matcher', async () => {
         myServer.endpoint
             .matching((ctx) => ctx.params.id === '2')
             .handleNext((ctx) => {
@@ -187,11 +196,11 @@ describe('testedProcedure', () => {
 
     /**
      * We can use 'matchingParams', 'matchingQuery', 'matchingHeaders', 'matchingBody' to test specific endpoint calls
-     * - to decide whether params/query/body does match or not, lodash's isMatch function is used, see https://lodash.com/docs/#isMatch
-     * - headers comparsion is case-insensitive, because the HTTP standard says to
-     * - values provided to matching params/query/headers are stringified before comparsion 
+     * - to decide whether params/query/body match or not, lodash's isMatch function is used, see https://lodash.com/docs/#isMatch
+     * - headers comparison is case-insensitive, because the HTTP standard says so
+     * - values provided to matching params/query/headers are stringified before comparison
      */
-    it('should call our endpoint - with custom handler', async () => {
+    it('should call our endpoint - with matching helpers', async () => {
         myServer.endpoint
             .matchingParams({ myPathParam: 'someValue' })
             .matchingQuery({ myQueryParam: 1 })
@@ -208,6 +217,29 @@ describe('testedProcedure', () => {
 });
 ```
 
+## Failed checks
 
+When a one-time handler is not called (or a `notReceive()` check fails), the test fails automatically after it finishes. If several checks fail within one test, they are reported together as an `AggregateError`.
 
+## Manual lifecycle (testRunner: 'none')
 
+With `testRunner: 'none'`, the server starts automatically but you drive the test integration yourself:
+
+```javascript
+const { MockServer } = require('mocked-server');
+
+const server = new MockServer(0, { testRunner: 'none' }); // port 0 picks a random free port
+
+await server.start();          // resolves once the server is listening (same as `await server.readyPromise`)
+console.log(server.port);      // the actually bound port
+
+// wire these into your own test hooks:
+server.reset();                // before each test: removes one-time handlers and pending checks
+server.runAllCheckers();       // after each test: throws if some checks did not pass
+
+await server.close();          // after all tests
+```
+
+## Debugging
+
+Run your tests with the `DEBUG=mocked-server` environment variable to log the server lifecycle and request handling.

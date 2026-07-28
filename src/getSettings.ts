@@ -1,13 +1,16 @@
 import fs from 'fs';
 import pkgUp from 'pkg-up';
+import { MockServerOptions, TestRunner } from './types';
 
 const packageJsonPath = pkgUp.sync();
 
 export interface Settings {
-    testRunner: 'mocha' | 'jest' | 'none' | string;
+    testRunner: TestRunner;
 }
 
-let packageResult: Settings;
+const validTestRunners: TestRunner[] = ['mocha', 'jest', 'none'];
+
+let packageResult: Settings | undefined;
 
 if (packageJsonPath) {
     try {
@@ -16,23 +19,26 @@ if (packageJsonPath) {
             packageResult = pkg['mocked-server'];
         }
     } catch (err) {
-        console.error('Unable to parse package.json');
+        console.error(`mocked-server: unable to parse "${packageJsonPath}":`, err);
     }
 }
 
+export function getSettings (options: MockServerOptions = {}): Settings {
 
-export function getSettings (): Settings {
+    if (options.testRunner) {
+        if (!validTestRunners.includes(options.testRunner)) {
+            throw new Error(`Invalid "testRunner" option "${options.testRunner}". Valid options are: ${validTestRunners.join(', ')}.`);
+        }
+        return { testRunner: options.testRunner };
+    }
 
-    // @ts-ignore
-    if (typeof packageResult === 'undefined') {
+    if (!packageResult) {
         throw new Error('Missing required "mocked-server" settings in the package.json. See documentation for example. https://www.npmjs.com/package/mocked-server');
     }
 
-    const validTestRunners = ['mocha', 'jest', 'none'];
     if (!validTestRunners.includes(packageResult.testRunner)) {
         throw new Error(`Missing or invalid option for key "testRunner" in the package.json. Valid options are: ${validTestRunners.join(', ')}.`);
     }
 
     return packageResult;
 }
-

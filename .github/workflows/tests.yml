@@ -1,5 +1,5 @@
-# This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
+# Clean install of dependencies, build and full test run (mocha + jest + types)
+# across supported Node.js versions and mocha majors.
 
 name: Tests CI
 
@@ -14,14 +14,15 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                node-version: [10.x, 12.x, 14.x, 16.x]
-                mocha-version: [7.x, 9.x, latest]
+                node-version: [18.x, 20.x, 22.x, 24.x]
+                mocha-version: [10.x, latest]
         steps:
-            - uses: actions/checkout@v2
+            - uses: actions/checkout@v4
             - name: Use Node.js ${{ matrix.node-version }}
-              uses: actions/setup-node@v1
+              uses: actions/setup-node@v4
               with:
                   node-version: ${{ matrix.node-version }}
-            - run: npm install
-            - run: npm install mocha@${{ matrix.mocha-version }}
+                  cache: npm
+            - run: npm ci
+            - run: npm install --no-save mocha@${{ matrix.mocha-version }}
             - run: npm test
