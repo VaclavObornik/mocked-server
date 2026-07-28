@@ -14,11 +14,14 @@
 
 ### Added
 - Constructor options: `new MockServer(port, { testRunner: 'jest' })` overrides the package.json configuration.
-- Public `start()` and `close()` methods; `start()` is idempotent. Together with the new `port` getter and support for port `0` (random free port), the server can be used with any test runner via `testRunner: 'none'`.
+- Public `start()` and `close()` methods; `start()` is idempotent while the server runs, and the server can be started again after `close()` (or after a failed start). Together with the new `port` getter and support for port `0` (random free port), the server can be used with any test runner via `testRunner: 'none'`.
+- `port` getter with the actually bound port. It stays assignable (as any undeclared property was before), so subclasses that set `this.port` keep working.
 - URLs with default ports (`http://…` / `https://…` without an explicit port) are now accepted.
 
 ### Changed
 - Routing now uses the maintained `@koa/router` (v13) instead of the abandoned `koa-router` (v10). The route syntax is unchanged (both use path-to-regexp v6).
 - Upgraded `koa` to 2.16 and `debug` to 4.4.
 - Node.js >= 18 is required (declared in `engines`).
-- The npm package now ships only `dist` (plus README and LICENSE).
+- The npm package now ships only `dist` (plus README, LICENSE and CHANGELOG); source maps now embed the sources.
+- TypeScript: the `_readyPromise` field is private now — use the `readyPromise` getter instead.
+- `@types/koa-bodyparser` and `@types/koa-router` are no longer dependencies; if your project relied on them transitively, add them to your own devDependencies.

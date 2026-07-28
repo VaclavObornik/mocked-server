@@ -82,10 +82,20 @@ export class MockServer {
         }
     }
 
+    private _assignedPortValue: number | undefined;
+
     /** The port the server is bound to. Useful when the server was created with port 0 (random port). */
     public get port (): number {
+        if (this._assignedPortValue !== undefined) {
+            return this._assignedPortValue;
+        }
         const address = this.server.address();
         return (address !== null && typeof address === 'object') ? address.port : this._port;
+    }
+
+    // the setter keeps 'port' assignable as it was up to v8.4 (subclasses used it as a plain property)
+    public set port (value: number) {
+        this._assignedPortValue = value;
     }
 
     private static _parsePort (urlOrPort: string|number): number {
@@ -124,9 +134,10 @@ export class MockServer {
         this._readyPromise = new Promise<void>((resolve, reject) => {
             const onErrorCallback = (err: Error) => {
                 debug(`server listen() error for port ${this._port}`);
+                this._readyPromise = undefined; // allow a later start() to retry the listen
                 reject(err);
             };
-            this.server.on('error', onErrorCallback); // typically EADDRINUSE
+            this.server.once('error', onErrorCallback); // typically EADDRINUSE
             this.server.listen(this._port, () => {
                 debug(`server listening on port ${this._port}`);
                 this.server.removeListener('error', onErrorCallback);
@@ -151,6 +162,7 @@ export class MockServer {
                     reject(err);
                 } else {
                     debug(`server closed for port ${this._port}`);
+                    this._readyPromise = undefined; // allow a later start() to listen again
                     resolve();
                 }
             });
@@ -251,6 +263,7 @@ export class MockServer {
      * @internal
      */
     _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T>|undefined, promiseLike: true): AwaitableChecker;
+    /** @internal */
     _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T>|undefined, promiseLike: false): Checker;
     _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T> = (ctx, next) => next(), promiseLike: boolean): AwaitableChecker | Checker {
 

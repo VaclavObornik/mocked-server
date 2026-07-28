@@ -165,4 +165,55 @@ describe('MockServer construction and lifecycle', () => {
         await server.close();
     });
 
+    it('should be able to start again after close', async () => {
+        const server = new MockedServer(0, { testRunner: 'none' });
+        await server.readyPromise;
+        await server.close();
+
+        await server.start();
+        assert(server.port > 0);
+        await supertest(`http://127.0.0.1:${server.port}`)
+            .get('/no-handler')
+            .expect(404);
+        await server.close();
+    });
+
+    it('should allow start() to retry after a failed listen', async () => {
+        const net = require('net');
+        const blocker = net.createServer();
+        await new Promise((resolve) => blocker.listen(0, resolve));
+        const blockedPort = blocker.address().port;
+
+        const originalConsoleError = console.error;
+        console.error = () => {}; // silence the intentional 'unable to start' report
+        let server;
+        try {
+            server = new MockedServer(blockedPort, { testRunner: 'none' });
+            await assert.rejects(server.readyPromise, /EADDRINUSE/);
+        } finally {
+            console.error = originalConsoleError;
+        }
+
+        await new Promise((resolve) => blocker.close(resolve));
+
+        await server.start(); // must attempt a fresh listen, not return the stale rejected promise
+        await supertest(`http://127.0.0.1:${blockedPort}`)
+            .get('/no-handler')
+            .expect(404);
+        await server.close();
+    });
+
+    it('should keep port assignable in subclasses as it was in v8.4', async () => {
+        class LegacySubclass extends MockedServer {
+            constructor () {
+                super(0, { testRunner: 'none' });
+                this.port = 12345; // v8.4 subclasses could use 'port' as a plain property
+            }
+        }
+        const server = new LegacySubclass();
+        assert.strictEqual(server.port, 12345);
+        await server.readyPromise;
+        await server.close();
+    });
+
 });

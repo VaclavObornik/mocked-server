@@ -4,6 +4,7 @@
         "declaration": true,
         "outDir": "dist",
         "sourceMap": true,
+        "inlineSources": true,
         "newLine": "lf",
         "stripInternal": true
     },
