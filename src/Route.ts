@@ -64,8 +64,10 @@ export class Route {
             throw new Error(`Unknown matcher prop(s) "${invalidProps.join(', ')}". Only "${validProps.join(', ')}" are supported.`);
         }
 
-        return (usedProps as MatcherProp[]).reduce((prev: Route, prop: MatcherProp): Route => {
-            // props come from Object.keys(matcher), so the values cannot be undefined
+        // an explicit undefined value means the prop is omitted, so the assertions below are safe
+        const definedProps = (usedProps as MatcherProp[]).filter((prop) => typeof matcher[prop] !== 'undefined');
+
+        return definedProps.reduce((prev: Route, prop: MatcherProp): Route => {
             if (prop === 'headers') {
                 return prev.matchingHeaders(matcher[prop]!);
             }

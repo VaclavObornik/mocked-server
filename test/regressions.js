@@ -52,6 +52,22 @@ describe('concurrent requests with an async matcher', () => {
 
 });
 
+describe('object matcher edge cases', () => {
+
+    it('should treat an explicitly undefined matcher prop as omitted', async () => {
+        mockApi.generalEndpoint
+            .matching({ query: undefined })
+            .handleNext((ctx) => {
+                ctx.status = 201;
+                ctx.body = 'matched';
+            });
+
+        await request.get('/general-endpoint')
+            .expect(201, 'matched');
+    });
+
+});
+
 describe('runAllCheckers aggregation', () => {
 
     it('should report all failed checks at once', () => {
