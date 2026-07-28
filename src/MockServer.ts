@@ -15,7 +15,11 @@ export class MockServer {
 
     private _readyPromise: Promise<void> | undefined;
 
-    /** Resolves once the server is listening; rejects when the port cannot be bound. */
+    /**
+     * Resolves once the server is listening; rejects when the port cannot be bound.
+     * Undefined when the server is not starting/running — prefer `await start()`,
+     * which always returns a promise (and never boots the server as a side effect of a read).
+     */
     public get readyPromise (): Promise<void> | undefined {
         return this._readyPromise;
     }
