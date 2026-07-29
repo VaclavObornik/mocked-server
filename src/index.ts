@@ -2,7 +2,7 @@
 import { MockServer } from "./MockServer";
 export default MockServer;
 export { MockServer } from "./MockServer";
-export { Route } from "./Route";
+export { Route, ExtendedRoute, RouteExtender } from "./Route";
 export {
     AwaitableChecker,
     Checker,
