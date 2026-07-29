@@ -357,6 +357,141 @@ describe('handleNext', () => {
 });
 
 
+describe('extend', () => {
+
+    it('should provide custom chainable matcher shortcuts', async () => {
+
+        const endpoint = mockApi.generalEndpoint.extend((route) => ({
+            matchResourceId (resourceId) {
+                return route.matchingParam('resourceId', resourceId);
+            }
+        }));
+
+        endpoint.matchResourceId(99).handleNext((ctx) => {
+            ctx.status = 202;
+            ctx.body = 'onetimeHandler2';
+        });
+
+        await request.get('/general-endpoint')
+            .expect(200, { endpoint: 1 });
+
+        await request.get('/general-endpoint/99')
+            .expect(202, 'onetimeHandler2');
+    });
+
+    it('should keep custom methods available after built-in matchers (chaining)', async () => {
+
+        const endpoint = mockApi.generalEndpoint.extend((route) => ({
+            matchResourceId (resourceId) {
+                return route.matchingParam('resourceId', resourceId);
+            }
+        }));
+
+        endpoint
+            .matching({ query: { flag: 'on' } }) // object form derives too
+            .matchResourceId(99) // still available after a built-in matcher
+            .handleNext((ctx) => {
+                ctx.status = 202;
+                ctx.body = 'onetimeHandler2';
+            });
+
+        await request.get('/general-endpoint/99')
+            .expect(200, { endpoint: 1 }); // query does not match
+
+        await request.get('/general-endpoint/99?flag=on')
+            .expect(202, 'onetimeHandler2');
+    });
+
+    it('should combine matchers from stacked extends', async () => {
+
+        const endpoint = mockApi.generalEndpoint
+            .extend((route) => ({
+                matchResourceId (resourceId) {
+                    return route.matchingParam('resourceId', resourceId);
+                }
+            }))
+            .extend((route) => ({
+                matchAuthorized () {
+                    return route.matchingHeader('authorization', 'token-1');
+                }
+            }));
+
+        endpoint.matchResourceId(99).matchAuthorized().handleNext((ctx) => {
+            ctx.status = 202;
+            ctx.body = 'onetimeHandler2';
+        });
+
+        await request.get('/general-endpoint/99')
+            .expect(200, { endpoint: 1 }); // header missing
+
+        await request.get('/general-endpoint/99')
+            .set({ Authorization: 'token-1' })
+            .expect(202, 'onetimeHandler2');
+    });
+
+    it('should not modify the original route', () => {
+        const endpoint = mockApi.generalEndpoint.extend(() => ({ customHelper () {} }));
+        assert.strictEqual(typeof endpoint.customHelper, 'function');
+        assert.strictEqual(typeof mockApi.generalEndpoint.customHelper, 'undefined');
+    });
+
+    it('should reject an extension property conflicting with an existing member', () => {
+        assert.throws(
+            () => mockApi.generalEndpoint.extend(() => ({ handleNext () {} })),
+            /Extension property "handleNext" conflicts with an existing Route member or an earlier extension./
+        );
+        assert.throws(
+            () => mockApi.generalEndpoint.extend(() => ({ _matchers: [] })),
+            /Extension property "_matchers" conflicts with an existing Route member or an earlier extension./
+        );
+        assert.throws(
+            () => mockApi.generalEndpoint
+                .extend(() => ({ customHelper () {} }))
+                .extend(() => ({ customHelper () {} })), // same name in a later extension
+            /Extension property "customHelper" conflicts with an existing Route member or an earlier extension./
+        );
+        // inherited Object members do not count as conflicts and may be overridden
+        const labeled = mockApi.generalEndpoint.extend(() => ({ toString: () => 'my endpoint' }));
+        assert.strictEqual(`${labeled}`, 'my endpoint');
+    });
+
+    it('should reject deriving a route inside the extender body', () => {
+        assert.throws(
+            () => mockApi.generalEndpoint.extend((route) => ({
+                narrowed: route.matchingParam('resourceId', 1) // deriving eagerly would recurse forever
+            })),
+            /Cannot derive a route while an extender is being applied/
+        );
+    });
+
+    it('should reject invalid extender results', () => {
+        assert.throws(
+            () => mockApi.generalEndpoint.extend(() => null),
+            /An extender must return an object with the extension properties./
+        );
+        assert.throws(
+            () => mockApi.generalEndpoint.extend(async () => ({ helper () {} })),
+            /An extender must return the extension object synchronously; async extenders are not supported./
+        );
+        assert.throws(
+            // an object literal { __proto__: ... } would not create an own key; JSON.parse does
+            () => mockApi.generalEndpoint.extend(() => JSON.parse('{ "__proto__": { "polluted": true } }')),
+            /Extension property "__proto__" is not allowed./
+        );
+        assert.strictEqual(Object.getPrototypeOf(mockApi.generalEndpoint).polluted, undefined);
+    });
+
+    it('should preserve accessor extension properties', () => {
+        let counter = 0;
+        const endpoint = mockApi.generalEndpoint.extend(() => ({
+            get callCount () { return ++counter; }
+        }));
+        assert.strictEqual(endpoint.callCount, 1); // the getter itself is copied, not its value
+        assert.strictEqual(endpoint.matchingParam('resourceId', 1).callCount, 2); // and survives derivation
+    });
+
+});
+
 describe('notReceive', () => {
 
     it('should fail when any request came to the endpoint', async () => {

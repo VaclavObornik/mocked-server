@@ -1,5 +1,10 @@
 # Changelog
 
+## 8.6.0 (2026-07-29)
+
+### Added
+- `route.extend(...)`: add named, chainable matcher shortcuts to a route. The helpers survive chaining with the built-in `matching*` methods and are fully typed in TypeScript (new exported types `ExtendedRoute` and `RouteExtender`). See the "Custom matcher shortcuts" section in the README.
+
 ## 8.5.0 (2026-07-29)
 
 ### Fixed

@@ -217,6 +217,52 @@ describe('testedProcedure', () => {
 });
 ```
 
+## Custom matcher shortcuts: `extend`
+
+When the same matcher appears in many tests, give it a name with `extend`. It returns a new route
+with your helper methods added; the original route is not changed.
+
+```javascript
+class SomeService extends MockServer {
+
+    constructor () {
+        super(3000);
+
+        this.endpoint = this.post('/somePath/:id', (ctx) => {
+            ctx.body = { message: 'default response' };
+        }).extend((route) => ({
+            withId (id) {
+                return route.matchingParam('id', id);
+            },
+            authorizedBy (token) {
+                return route.matchingHeader('Authorization', `Bearer ${token}`);
+            },
+        }));
+    }
+
+}
+```
+
+The helpers stay chainable — with the built-in matchers and with each other:
+
+```javascript
+myServer.endpoint
+    .withId(42)
+    .authorizedBy('myToken')
+    .matchingBody({ some: 'property' }) // built-in matchers still work
+    .withId(42)                         // ...and your helpers stay available after them
+    .handleNext();
+```
+
+Notes:
+- `extend` can be called repeatedly; later extensions can use the earlier helpers.
+- The extender function runs again for every derived route — keep it pure (no side effects)
+  and synchronous (an async extender throws). Create derived routes only inside the returned
+  helpers; calling `matching*` or `extend` in the extender body itself throws an error.
+- A helper name that conflicts with an existing route member (like `handleNext`) or with an
+  earlier extension throws an error.
+- In TypeScript, the helpers and the chaining are fully typed (see the `ExtendedRoute` and `RouteExtender` exported types).
+
 ## Failed checks
 
 When a one-time handler is not called (or a `notReceive()` check fails), the test fails automatically after it finishes. If several checks fail within one test, they are reported together as an `AggregateError`.
