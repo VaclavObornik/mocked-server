@@ -25,6 +25,19 @@ extended.matchResourceId(1).matchingQueryParam('flag', 'on').matchResourceId(2).
 const description: string = extended.describePath();
 void description;
 
+// stacked extends: helpers from both levels stay chainable in any order,
+// and a later extender can use the earlier helpers
+const stacked = extended.extend((r) => ({
+    matchAuthorized () {
+        return r.matchingHeader('authorization', 'token');
+    },
+    matchAuthorizedResource (resourceId: number) {
+        return r.matchResourceId(resourceId).matchingHeader('authorization', 'token');
+    },
+}));
+stacked.matchResourceId(1).matchAuthorized().matchingParam('id', 2).matchResourceId(3).handleNext();
+stacked.matchAuthorizedResource(1).matchResourceId(2).notReceive();
+
 // the helper types are exported
 const namedExtender: RouteExtender<{ helper (): Route }> = (r) => ({ helper: () => r });
 declare const namedExtended: ExtendedRoute<Route, { helper (): Route }>;

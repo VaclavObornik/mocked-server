@@ -19,14 +19,18 @@ export type RouteExtender<X extends object = object> = (route: Route) => X;
 
 /**
  * The type of a route returned by Route.extend(): the route itself plus the extension.
- * Extension methods that return a Route are re-typed to return the extended route,
- * so custom helpers stay chainable.
+ * Extension methods that return a Route are re-typed to return the receiver's own type,
+ * so custom helpers stay chainable — even across stacked extend() calls.
  */
 export type ExtendedRoute<R extends Route, X> = R & {
     [K in keyof X]: X[K] extends (...args: infer A) => infer Ret
-        ? Ret extends Route ? (...args: A) => ExtendedRoute<R, X> : X[K]
+        ? Ret extends Route ? <Self extends Route>(this: Self, ...args: A) => Self : X[K]
         : X[K];
 };
+
+// guards against infinite recursion: an extender body deriving a route (matching*/extend)
+// would re-apply the same extender on the derived route, forever
+let applyingExtender = false;
 
 
 function testMatch (tested: Record<any, any>, template: TemplateMatcher, expectStrings: boolean): boolean {
@@ -56,10 +60,20 @@ export class Route {
         private _extenders: RouteExtender[] = []
     ) {
         for (const extender of this._extenders) {
-            const extension = extender(this);
-            for (const key of Object.keys(extension)) {
-                if (key in this) {
-                    throw new Error(`Extension property "${key}" conflicts with an existing Route member.`);
+            if (applyingExtender) {
+                throw new Error('Cannot derive a route while an extender is being applied.'
+                    + ' Call matching*/extend inside the returned helper methods, not in the extender body itself.');
+            }
+            applyingExtender = true;
+            let extension: object;
+            try {
+                extension = extender(this);
+            } finally {
+                applyingExtender = false;
+            }
+            for (const key of Reflect.ownKeys(extension)) {
+                if (this._hasConflictingMember(key)) {
+                    throw new Error(`Extension property "${String(key)}" conflicts with an existing Route member or an earlier extension.`);
                 }
             }
             Object.assign(this, extension);
@@ -67,11 +81,29 @@ export class Route {
     }
 
     /**
+     * A conflict is an own property (a private field or an earlier extension) or a member
+     * found on the prototype chain before Object.prototype — inherited Object members
+     * like toString may be overridden by an extension.
+     */
+    private _hasConflictingMember (key: PropertyKey): boolean {
+        if (Object.prototype.hasOwnProperty.call(this, key)) {
+            return true;
+        }
+        for (let proto = Object.getPrototypeOf(this); proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
+            if (Object.prototype.hasOwnProperty.call(proto, key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Every derived Route goes through here so registered extenders are re-applied
      * (in the constructor) and custom extension methods survive chaining.
      */
     private _derive (matchers: MatcherFunction[], extenders: RouteExtender[]): this {
-        return new Route(this._mockServer, this._method, this._path, matchers, extenders) as this;
+        const RouteClass = this.constructor as typeof Route;
+        return new RouteClass(this._mockServer, this._method, this._path, matchers, extenders) as this;
     }
 
     /**

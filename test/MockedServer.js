@@ -388,7 +388,7 @@ describe('extend', () => {
         }));
 
         endpoint
-            .matchingQueryParam('flag', 'on')
+            .matching({ query: { flag: 'on' } }) // object form derives too
             .matchResourceId(99) // still available after a built-in matcher
             .handleNext((ctx) => {
                 ctx.status = 202;
@@ -438,11 +438,29 @@ describe('extend', () => {
     it('should reject an extension property conflicting with an existing member', () => {
         assert.throws(
             () => mockApi.generalEndpoint.extend(() => ({ handleNext () {} })),
-            /Extension property "handleNext" conflicts with an existing Route member./
+            /Extension property "handleNext" conflicts with an existing Route member or an earlier extension./
         );
         assert.throws(
             () => mockApi.generalEndpoint.extend(() => ({ _matchers: [] })),
-            /Extension property "_matchers" conflicts with an existing Route member./
+            /Extension property "_matchers" conflicts with an existing Route member or an earlier extension./
+        );
+        assert.throws(
+            () => mockApi.generalEndpoint
+                .extend(() => ({ customHelper () {} }))
+                .extend(() => ({ customHelper () {} })), // same name in a later extension
+            /Extension property "customHelper" conflicts with an existing Route member or an earlier extension./
+        );
+        // inherited Object members do not count as conflicts and may be overridden
+        const labeled = mockApi.generalEndpoint.extend(() => ({ toString: () => 'my endpoint' }));
+        assert.strictEqual(`${labeled}`, 'my endpoint');
+    });
+
+    it('should reject deriving a route inside the extender body', () => {
+        assert.throws(
+            () => mockApi.generalEndpoint.extend((route) => ({
+                narrowed: route.matchingParam('resourceId', 1) // deriving eagerly would recurse forever
+            })),
+            /Cannot derive a route while an extender is being applied/
         );
     });
 

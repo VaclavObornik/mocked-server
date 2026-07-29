@@ -256,7 +256,11 @@ myServer.endpoint
 
 Notes:
 - `extend` can be called repeatedly; later extensions can use the earlier helpers.
-- A helper name that conflicts with an existing route member (like `handleNext`) throws an error.
+- The extender function runs again for every derived route — keep it pure (no side effects).
+  Create derived routes only inside the returned helpers; calling `matching*` or `extend`
+  in the extender body itself throws an error.
+- A helper name that conflicts with an existing route member (like `handleNext`) or with an
+  earlier extension throws an error.
 - In TypeScript, the helpers and the chaining are fully typed (see the `ExtendedRoute` and `RouteExtender` exported types).
 
 ## Failed checks
