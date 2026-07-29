@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 8.5.0 (2026-07-29)
 
 ### Fixed
 - A one-time handler can no longer process two concurrent requests when an async matcher is used.
@@ -25,3 +25,4 @@
 - The npm package now ships only `dist` (plus README, LICENSE and CHANGELOG); source maps now embed the sources.
 - TypeScript: the `_readyPromise` field is private now — use the `readyPromise` getter instead.
 - `@types/koa-bodyparser` and `@types/koa-router` are no longer dependencies; if your project relied on them transitively, add them to your own devDependencies.
+- Releases are now published to npm automatically when a version bump lands on master (with npm provenance).
