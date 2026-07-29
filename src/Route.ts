@@ -64,18 +64,21 @@ export class Route {
             throw new Error(`Unknown matcher prop(s) "${invalidProps.join(', ')}". Only "${validProps.join(', ')}" are supported.`);
         }
 
-        return (usedProps as MatcherProp[]).reduce((prev: Route, prop: MatcherProp): Route => {
+        // an explicit undefined value means the prop is omitted, so the assertions below are safe
+        const definedProps = (usedProps as MatcherProp[]).filter((prop) => typeof matcher[prop] !== 'undefined');
+
+        return definedProps.reduce((prev: Route, prop: MatcherProp): Route => {
             if (prop === 'headers') {
-                return prev.matchingHeaders(matcher[prop]);
+                return prev.matchingHeaders(matcher[prop]!);
             }
             if (prop === 'params') {
-                return prev.matchingParams(matcher[prop]);
+                return prev.matchingParams(matcher[prop]!);
             }
             if (prop === 'query') {
-                return prev.matchingQuery(matcher[prop]);
+                return prev.matchingQuery(matcher[prop]!);
             }
             if (prop === 'body') {
-                return prev.matchingBody(matcher[prop]);
+                return prev.matchingBody(matcher[prop]!);
             }
             throw new Error('This cannot happen.');
         }, this);

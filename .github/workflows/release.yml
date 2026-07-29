@@ -1,0 +1,44 @@
+# Publishes to npm when a version bump lands on master (same model as mongodash):
+# JS-DevTools/npm-publish only publishes when package.json's version is not on
+# the registry yet, so merges without a version bump are no-ops.
+# Requires the NPM_TOKEN repository secret (npm automation token).
+
+name: Publish release
+
+on:
+    push:
+        branches:
+            - master
+
+jobs:
+    publish-release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write # npm provenance attestation
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - name: Use Node.js 24.x
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 24.x
+                  registry-url: https://registry.npmjs.org
+
+            - name: Install dependencies
+              run: npm ci
+
+            # runs build + mocha + jest + type tests; leaves dist/ ready to publish
+            # (the publish action ignores lifecycle scripts as a security precaution)
+            - name: Test and Build
+              run: npm test
+
+            - name: Publish to NPM
+              uses: JS-DevTools/npm-publish@v4
+              with:
+                  token: ${{ secrets.NPM_TOKEN }}
+                  provenance: true

@@ -1,11 +1,12 @@
 {
-    "extends": "@tsconfig/node14/tsconfig.json",
+    "extends": "@tsconfig/node18/tsconfig.json",
     "compilerOptions": {
         "declaration": true,
         "outDir": "dist",
         "sourceMap": true,
+        "inlineSources": true,
         "newLine": "lf",
-        "stripInternal": true,
+        "stripInternal": true
     },
     "include": [
       "src/**/*"

@@ -1,19 +1,25 @@
 
-import url from 'url';
 import Koa, {Context, Middleware, Next} from 'koa';
-import Router from 'koa-router';
-import bodyParser from 'koa-bodyparser';
+import Router from '@koa/router';
+// untyped require: the koa augmentation in @types/koa-bodyparser (body?: unknown)
+// conflicts with the body?: any this library publishes for backward compatibility
+const bodyParser: (opts?: object) => Middleware = require('koa-bodyparser');
 import { Route } from './Route';
 import { getSettings } from './getSettings';
-import { AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, MatcherFunction, Method, Path } from './types';
+import { AwaitableChecker, Checker, DefaultHandler, LowercasedMethod, MatcherFunction, Method, MockServerOptions, Path } from './types';
 import { Server } from "http";
 import * as http from "http";
 import { debug } from './debug';
 
 export class MockServer {
 
-    public _readyPromise: Promise<void> | undefined;
+    private _readyPromise: Promise<void> | undefined;
 
+    /**
+     * Resolves once the server is listening; rejects when the port cannot be bound.
+     * Undefined when the server is not starting/running — prefer `await start()`,
+     * which always returns a promise (and never boots the server as a side effect of a read).
+     */
     public get readyPromise (): Promise<void> | undefined {
         return this._readyPromise;
     }
@@ -26,31 +32,17 @@ export class MockServer {
 
     private _pendingCheckers = new Array<Checker>();
 
-    private _nextHandledRequests = new WeakMap<Context, Context>();
+    private _nextHandledRequests = new WeakSet<Context>();
 
     private _nextHandlersRouter = new Router();
 
     private _commonHandlersRouter = new Router();
 
-    /**
-     * @param {string|number} urlOrPort
-     */
-    constructor (urlOrPort: string|number) {
+    constructor (urlOrPort: string|number, options: MockServerOptions = {}) {
 
         debug(`new MockedServer() called with urlOrPort: ${urlOrPort}`);
 
-        if (typeof urlOrPort === 'number') {
-            this._port = urlOrPort;
-
-        } else {
-            const parsed = url.parse(urlOrPort);
-
-            if (!parsed.port) {
-                throw new Error('URL does not contains port number');
-            }
-
-            this._port = parseInt(parsed.port);
-        }
+        this._port = MockServer._parsePort(urlOrPort);
 
         this._app.use(bodyParser({
             enableTypes: ['json', 'form', 'text'],
@@ -78,7 +70,7 @@ export class MockServer {
 
         this.server = http.createServer(this._app.callback());
 
-        const settings = getSettings();
+        const settings = getSettings(options);
 
         if (settings.testRunner === 'mocha') {
             this._bindMocha();
@@ -87,20 +79,73 @@ export class MockServer {
             this._bindJest();
 
         } else {
-            this.start();
+            // nobody awaits the promise in the 'none' mode; report instead of crashing on unhandledRejection
+            this.start().catch((err) => {
+                console.error(`mocked-server: unable to start the server on port ${this._port}:`, err);
+            });
         }
     }
 
-    private start () {
-        debug(`start() called, staring server on ${this._port}`);
+    private _assignedPortValue: number | undefined;
+
+    /** The port the server is bound to. Useful when the server was created with port 0 (random port). */
+    public get port (): number {
+        if (this._assignedPortValue !== undefined) {
+            return this._assignedPortValue;
+        }
+        const address = this.server.address();
+        return (address !== null && typeof address === 'object') ? address.port : this._port;
+    }
+
+    // the setter keeps 'port' assignable as it was up to v8.4 (subclasses used it as a plain property)
+    public set port (value: number) {
+        this._assignedPortValue = value;
+    }
+
+    private static _parsePort (urlOrPort: string|number): number {
+
+        if (typeof urlOrPort === 'number') {
+            return urlOrPort;
+        }
+
+        let parsed: URL;
+        try {
+            parsed = new URL(urlOrPort);
+        } catch (err) {
+            throw new Error(`Invalid URL "${urlOrPort}" passed to the MockServer constructor.`);
+        }
+
+        // new URL() normalizes default ports to an empty string
+        const defaultPorts: Record<string, string> = { 'http:': '80', 'https:': '443' };
+        const port = parsed.port || defaultPorts[parsed.protocol];
+
+        if (!port) {
+            throw new Error('URL does not contain a port number');
+        }
+
+        return parseInt(port, 10);
+    }
+
+    /**
+     * Starts the server. Called automatically when the 'mocha' or 'jest' testRunner is used.
+     * Repeated calls return the promise of the first call.
+     */
+    start (): Promise<void> {
+        if (this._readyPromise) {
+            return this._readyPromise;
+        }
+        debug(`start() called, starting server on ${this._port}`);
         this._readyPromise = new Promise<void>((resolve, reject) => {
             const onErrorCallback = (err: Error) => {
-                debug(`sever listen() error for port ${this._port}`);
+                debug(`server listen() error for port ${this._port}`);
+                this._readyPromise = undefined; // allow a later start() to retry the listen
                 reject(err);
             };
-            this.server.on('error', onErrorCallback); // typically EADDRINUSE
+            this.server.once('error', onErrorCallback); // typically EADDRINUSE
             this.server.listen(this._port, () => {
-                debug(`server listening on port ${this._port}`);
+                const address = this.server.address();
+                const boundPort = (address !== null && typeof address === 'object') ? address.port : this._port;
+                debug(`server listening on port ${boundPort}`);
                 this.server.removeListener('error', onErrorCallback);
                 resolve();
             });
@@ -108,8 +153,14 @@ export class MockServer {
         return this._readyPromise;
     }
 
-    private close () {
+    /**
+     * Stops the server. Called automatically when the 'mocha' or 'jest' testRunner is used.
+     * Rejects when the server is not running.
+     */
+    close (): Promise<void> {
         debug(`server.close called; closing port ${this._port}`);
+        // keep-alive sockets would otherwise block close() until their timeout (available since Node 18.2)
+        this.server.closeIdleConnections?.();
         return new Promise<void>((resolve, reject) => {
             this.server.close((err) => {
                 if (err) {
@@ -117,6 +168,7 @@ export class MockServer {
                     reject(err);
                 } else {
                     debug(`server closed for port ${this._port}`);
+                    this._readyPromise = undefined; // allow a later start() to listen again
                     resolve();
                 }
             });
@@ -130,25 +182,25 @@ export class MockServer {
         const mocha = require('mocha');
 
         mocha.before(async () => {
-            debug(`jest.beforeAll called; port ${this._port}`);
+            debug(`mocha.before called; port ${this._port}`);
             try {
                 await this.start();
-                debug(`jest.beforeAll success for port ${this._port}`);
+                debug(`mocha.before success for port ${this._port}`);
 
             } catch (err) {
-                debug(`jest.beforeAll error for port ${this._port}; error: ${err}`);
+                debug(`mocha.before error for port ${this._port}; error: ${err}`);
                 throw err;
             }
         });
 
         mocha.after(async () => {
-            debug(`mocha.afterAll called; port ${this._port}`);
+            debug(`mocha.after called; port ${this._port}`);
             try {
                 await this.close();
-                debug(`mocha.afterAll success for port ${this._port}`);
+                debug(`mocha.after success for port ${this._port}`);
 
             } catch (err) {
-                debug(`mocha.afterAll error for port ${this._port}; error: ${err}`);
+                debug(`mocha.after error for port ${this._port}; error: ${err}`);
                 throw err;
             }
         });
@@ -160,6 +212,7 @@ export class MockServer {
             try {
                 runAllCheckers();
             } catch (err) {
+                // report via the hook so mocha fails the test but keeps running the rest of the suite
                 // @ts-ignore
                 this.test.error(err);
             }
@@ -216,31 +269,39 @@ export class MockServer {
      * @internal
      */
     _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T>|undefined, promiseLike: true): AwaitableChecker;
+    /** @internal */
     _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T>|undefined, promiseLike: false): Checker;
     _handleNext<T> (method: Method, path: Path, matcher: MatcherFunction, handler: Middleware<T> = (ctx, next) => next(), promiseLike: boolean): AwaitableChecker | Checker {
 
         let requestReceived = false;
-        let error: Error;
-        let wasPromiseUsed = false;
-        let resolvePromise: (value?: unknown) => void;
+        let handlerFinished = false;
+        let error: Error | undefined;
+
+        let resolvePromise: () => void;
         let rejectPromise: (error: Error) => void;
-        const promise = new Promise((resolve, reject) => {
+        const promise = new Promise<void>((resolve, reject) => {
             resolvePromise = resolve;
             rejectPromise = reject;
         });
+        // the promise settles even when nobody awaits the checker; this no-op branch
+        // prevents an unhandledRejection crash while `then()` callers still get the rejection
+        promise.catch(() => {});
 
-        const cancel = this._addOnetimeHandler(method, path, matcher,async (ctx, next) => {
+        const cancel = this._addOnetimeHandler(method, path, matcher, async (ctx, next) => {
             requestReceived = true;
             try {
                 await handler(ctx, next);
-                if (wasPromiseUsed) {
-                    resolvePromise();
+                resolvePromise();
+            } catch (handlerError) {
+                error = handlerError as Error;
+                if (!ctx.headerSent) {
+                    // a default Koa 404 would point the tested code away from the real cause
+                    ctx.status = 500;
+                    ctx.body = { error: `${error}` };
                 }
-            } catch (handleError) {
-                error = handleError as Error;
-                if (wasPromiseUsed) {
-                    rejectPromise(error);
-                }
+                rejectPromise(error);
+            } finally {
+                handlerFinished = true;
             }
         });
 
@@ -248,9 +309,9 @@ export class MockServer {
             cancel();
             if (!requestReceived) {
                 error = new Error(`Mock api didn't receive expected ${method.toUpperCase()} request to '${path}' path.`);
-                if (wasPromiseUsed) {
-                    rejectPromise(error);
-                }
+                rejectPromise(error);
+            } else if (!handlerFinished) {
+                throw new Error(`Mock api received the expected ${method.toUpperCase()} request to '${path}' path, but its handler has not finished yet. Await the response in the test, or await the checker returned by waitForNext().`);
             }
             if (error) {
                 throw error;
@@ -261,18 +322,10 @@ export class MockServer {
             return checker;
         }
 
-
         return Object.assign(checker, {
             then (onfulfilled?: (value: any) => any, onrejected?: (reason: any) => never | any) {
-                if (!wasPromiseUsed) {
-                    unregister();
-                    wasPromiseUsed = true;
-                    if (error) {
-                        rejectPromise(error);
-                    } else if (requestReceived) {
-                        resolvePromise();
-                    }
-                }
+                // unregister so the automatic afterEach check does not fire for an awaited checker
+                unregister();
                 return promise.then(onfulfilled, onrejected);
             }
         });
@@ -282,7 +335,7 @@ export class MockServer {
     _notReceive (method: Method, path: Path, matcher: MatcherFunction): Checker {
         let error: Error;
 
-        const cancel = this._addOnetimeHandler(method, path, matcher,async (ctx, next) => {
+        const cancel = this._addOnetimeHandler(method, path, matcher, async (ctx, next) => {
             error = new Error(`Mock api received unexpected ${method.toUpperCase()} request to '${path}' path`);
             return next();
         });
@@ -296,11 +349,28 @@ export class MockServer {
     }
 
     /**
-     * Runs all not-called checkers.
+     * Runs all not-called checkers. Throws the failure when exactly one check fails,
+     * or an AggregateError when multiple checks fail.
      */
     runAllCheckers () {
-        // slice because of the original array is being changed during the iteration
-        this._pendingCheckers.slice().forEach(checker => checker());
+        const errors: Error[] = [];
+
+        // slice because checkers unregister themselves from the array as they run
+        for (const checker of this._pendingCheckers.slice()) {
+            try {
+                checker();
+            } catch (err) {
+                errors.push(err as Error);
+            }
+        }
+
+        if (errors.length === 1) {
+            throw errors[0];
+        }
+        if (errors.length > 1) {
+            const summary = errors.map((err) => ` - ${err.message}`).join('\n');
+            throw new AggregateError(errors, `${errors.length} mocked-server checks failed:\n${summary}`);
+        }
     }
 
     /**
@@ -397,11 +467,7 @@ export class MockServer {
 
         this._nextHandlersRouter[this._lowercaseMethod(method)](path, async (ctx, next) => {
 
-            if (!pending) {
-                return next();
-            }
-
-            if (this._nextHandledRequests.has(ctx)) {
+            if (!pending || this._nextHandledRequests.has(ctx)) {
                 return next();
             }
 
@@ -409,7 +475,12 @@ export class MockServer {
                 return next();
             }
 
-            this._nextHandledRequests.set(ctx, ctx);
+            // re-check: a concurrent request could have consumed this handler while the matcher was awaited
+            if (!pending) {
+                return next();
+            }
+
+            this._nextHandledRequests.add(ctx);
             disableHandler();
             await handler(ctx, next);
         });
@@ -418,4 +489,3 @@ export class MockServer {
     }
 
 }
-
