@@ -37,7 +37,8 @@ function readPackageSettings (): void {
 
 export function getSettings (options: MockServerOptions = {}): Settings {
 
-    if (options.testRunner) {
+    // != null: undefined/null mean "not provided"; anything else (incl. '') must validate
+    if (options.testRunner != null) {
         if (!validTestRunners.includes(options.testRunner)) {
             throw new Error(`Invalid "testRunner" option "${options.testRunner}". Valid options are: ${validTestRunners.join(', ')}.`);
         }

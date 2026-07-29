@@ -143,7 +143,9 @@ export class MockServer {
             };
             this.server.once('error', onErrorCallback); // typically EADDRINUSE
             this.server.listen(this._port, () => {
-                debug(`server listening on port ${this._port}`);
+                const address = this.server.address();
+                const boundPort = (address !== null && typeof address === 'object') ? address.port : this._port;
+                debug(`server listening on port ${boundPort}`);
                 this.server.removeListener('error', onErrorCallback);
                 resolve();
             });
