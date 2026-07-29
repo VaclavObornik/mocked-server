@@ -464,6 +464,32 @@ describe('extend', () => {
         );
     });
 
+    it('should reject invalid extender results', () => {
+        assert.throws(
+            () => mockApi.generalEndpoint.extend(() => null),
+            /An extender must return an object with the extension properties./
+        );
+        assert.throws(
+            () => mockApi.generalEndpoint.extend(async () => ({ helper () {} })),
+            /An extender must return the extension object synchronously; async extenders are not supported./
+        );
+        assert.throws(
+            // an object literal { __proto__: ... } would not create an own key; JSON.parse does
+            () => mockApi.generalEndpoint.extend(() => JSON.parse('{ "__proto__": { "polluted": true } }')),
+            /Extension property "__proto__" is not allowed./
+        );
+        assert.strictEqual(Object.getPrototypeOf(mockApi.generalEndpoint).polluted, undefined);
+    });
+
+    it('should preserve accessor extension properties', () => {
+        let counter = 0;
+        const endpoint = mockApi.generalEndpoint.extend(() => ({
+            get callCount () { return ++counter; }
+        }));
+        assert.strictEqual(endpoint.callCount, 1); // the getter itself is copied, not its value
+        assert.strictEqual(endpoint.matchingParam('resourceId', 1).callCount, 2); // and survives derivation
+    });
+
 });
 
 describe('notReceive', () => {

@@ -71,12 +71,23 @@ export class Route {
             } finally {
                 applyingExtender = false;
             }
+            if (extension === null || typeof extension !== 'object') {
+                throw new Error('An extender must return an object with the extension properties.');
+            }
+            if (typeof (extension as { then?: unknown }).then === 'function') {
+                throw new Error('An extender must return the extension object synchronously; async extenders are not supported.');
+            }
             for (const key of Reflect.ownKeys(extension)) {
+                if (key === '__proto__') {
+                    throw new Error('Extension property "__proto__" is not allowed.');
+                }
                 if (this._hasConflictingMember(key)) {
                     throw new Error(`Extension property "${String(key)}" conflicts with an existing Route member or an earlier extension.`);
                 }
             }
-            Object.assign(this, extension);
+            // descriptor-based copy keeps accessors and non-enumerable properties intact,
+            // which Object.assign would evaluate or silently skip
+            Object.defineProperties(this, Object.getOwnPropertyDescriptors(extension));
         }
     }
 
