@@ -43,7 +43,7 @@
   },
   "homepage": "https://github.com/VaclavObornik/mocked-server#readme",
   "dependencies": {
-    "@koa/router": "^13.1.1",
+    "@koa/router": "^15.7.0",
     "@types/koa": "^2.15.0",
     "debug": "^4.4.0",
     "koa": "^2.16.4",
